@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tophair</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+    <header class="hero">
+        <div class="overlay">
+            <img src="logo.jpeg" alt="Tophair" class="logo">
+            <p>Tophair Barber Shop</p>
+        </div>
+    </header>
+    <main class="admin">
+        <div class="admin-section">
+            <p>Sezione utenti</p>
+            <button onclick="goToService('addUser')">Aggiungi Utente</button>
+            <button onclick="goToService('editUser')">Modifica Utente</button>
+            <button onclick="goToService('deleteUser')">Elimina Utente</button>
+            <button onclick="goToService('viewUsers')">Visualizza Utenti</button>
+        </div>
+        <div class="admin-section">
+            <p>Sezione servizi</p>
+            <button onclick="goToService('addService')">Aggiungi Servizio</button>
+            <button onclick="goToService('editService')">Modifica Servizio</button>
+            <button onclick="goToService('deleteService')">Elimina Servizio</button>
+            <button onclick="goToService('viewServices')">Visualizza Servizi</button>
+        </div>
+        <div class="admin-section">
+            <p>Sezione prenotazioni</p>
+            <button onclick="goToService('addReservation')">Aggiungi Prenotazione</button>
+            <button onclick="goToService('editReservation')">Modifica Prenotazione</button>
+            <button onclick="goToService('deleteReservation')">Elimina Prenotazione</button>
+            <button onclick="goToService('viewReservations')">Visualizza Prenotazioni</button>
+        </div>
+    </main>
+    <script>
+        function goToService(service) {
+            window.location.href = `administration.html?service=${encodeURIComponent(service)}`;
+        }
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tophair</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <header class="hero">
+        <div class="overlay">
+            <img src="logo.jpeg" alt="Tophair" class="logo">
+            <p>Tophair Barber Shop</p>
+        </div>
+    </header>
+    <main id="serviceContent" class="admin">
+        <!-- Contenuti dinamici per ciascun servizio verranno caricati qui -->
+    </main>
+
+    <script>
+        var urlParams = new URLSearchParams(window.location.search);
+        var service = urlParams.get('service');
+        console.log("Trovato il servizio: " + service);
+
+        var serviceContent = document.getElementById('serviceContent');
+
+        // Funzione per cambiare contenuto in base al servizio
+        switch (service) {
+            case 'addUser':
+                serviceContent.innerHTML = `
+      <div class="admin-section">
+          <h2>Aggiungi Utente</h2>
+          <form id="addUserForm">
+              <label for="nome">Nome:</label>
+              <input type="text" id="nome" name="nome" required minlength="3"><br><br>
+  
+              <label for="cognome">Cognome:</label>
+              <input type="text" id="cognome" name="cognome" required minlength="3"><br><br>
+  
+              <label for="username">Nome Utente:</label>
+              <input type="text" id="username" name="username" required minlength="5"><br><br>
+  
+              <label for="password">Password:</label>
+              <input type="password" id="password" name="password" required minlength="8"><br><br>
+  
+              <button type="submit">Aggiungi Utente</button>
+          </form>
+      </div>
+    `;
+                // Aggiunge l'event listener per il form "addUser"
+                var addUserForm = document.getElementById('addUserForm');
+                if (addUserForm) {
+                    addUserForm.addEventListener('submit', addUser);
+                }
+                break;
+
+            case 'editUser':
+
+                serviceContent.innerHTML = `
+      <div class="admin-section">
+          <h2>Modifica Utente</h2>
+          <form id="editUserForm">
+              <label for="username">Nome Utente:</label>
+              <input type="text" id="username" name="username" required><br><br>
+  
+              <button id="carica_dati_button" type="button" onclick="loadUserData()">Carica Dati</button>
+  
+              <div id="userData" style="display:none;">
+                  <label for="Nome">Nuovo Nome:</label>
+                  <input class="readonly_field" type="text" id="nome" name="Nome"><br><br>
+  
+                  <label for="Cognome">Nuovo Cognome:</label>
+                  <input class="readonly_field" type="text" id="cognome" name="Cognome"><br><br>
+  
+                  <label for="newPassword">Nuova Password:</label>
+                  <input type="password" id="newPassword" name="newPassword"><br><br>
+  
+                  <button type="submit">Salva Modifiche</button>
+              </div>
+              <p id="errorMessage" style="color:red; display:none;">Utente non trovato</p>
+          </form>
+      </div>
+    `;
+                // Aggiunge l'event listener per il form "editUser"
+                var editUserForm = document.getElementById('editUserForm');
+                if (editUserForm) {
+                    editUserForm.addEventListener('submit', editPassword);
+                }
+                var urlParams = new URLSearchParams(window.location.search);
+                var _username = urlParams.get('username');
+                console.log("Trovato l'username: " + _username);
+
+                if (_username) {
+                    document.getElementById('username').value = _username;
+                    loadUserData();
+                }
+                break;
+            case 'deleteUser':
+                serviceContent.innerHTML = `
+                    <div class="admin-section">
+                        <h2>Elimina Utente</h2>
+                        <form id="deleteUserForm">
+                            <label for="username">Nome Utente:</label>
+                            <input type="text" id="username" name="username" required><br><br>
+                            <button type="submit">Elimina Utente</button>
+                        </form>
+                    </div>
+                `;
+                // Aggiungi un listener per l'invio del form
+                document.getElementById('deleteUserForm').addEventListener('submit', deleteUser);
+                break;
+
+
+            case 'viewUsers':
+                serviceContent.innerHTML = `
+                            <div class="admin-section">
+                                <h2>Visualizza Utenti</h2>
+                                <p>Qui puoi vedere l'elenco di tutti gli utenti registrati.</p>
+                                <table id="usersTable" class="users-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Nome Utente</th>
+                                            <th>Nome</th>
+                                            <th>Azioni</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                </table>
+                            </div>
+                            `;
+                loadUsers(); // Chiamata alla funzione separata per caricare gli utenti
+                break;
+            default:
+                serviceContent.innerHTML = `
+      <div class="admin-section">
+          <h2>Servizio non riconosciuto</h2>
+          <p>Il servizio richiesto non è disponibile</p>
+      </div>
+    `;
+                break;
+        }
+
+
+        // Funzione per aggiungere un utente
+        function addUser(event) {
+            event.preventDefault();
+
+            var nome = document.getElementById('nome').value;
+            var cognome = document.getElementById('cognome').value;
+            var username = document.getElementById('username').value;
+            var password = document.getElementById('password').value;
+
+            var userData = {
+                nome: nome,
+                cognome: cognome,
+                username: username,
+                password: password
+            };
+
+            fetch('http://localhost:3000/api/addUser', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        alert(data.message);
+                        window.location.href = 'admin.html';
+
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore:', error);
+                    alert('Errore nella richiesta: ' + error);
+                });
+        }
+
+        function loadUsers() {
+            fetch('http://localhost:3000/api/getUsers')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        var users = data.users;
+                        console.log(JSON.stringify(users));
+                        var tbody = document.querySelector('#usersTable tbody');
+                        tbody.innerHTML = ''; // Pulisce la tabella
+
+                        // Popola la tabella con i dati degli utenti
+                        users.forEach(user => {
+                            var row = document.createElement('tr');
+                            row.innerHTML = `
+                        <td>${user.username}</td>
+                        <td>${user.nome}<br>${user.cognome}</td>
+                        <td style="gap: 5px; display: flex; flex-direction: column;">
+                            <button class="edit-btn" data-username="${user.username}">Modifica</button>
+                            <button class="delete-btn" data-username="${user.username}">Elimina</button>
+                        </td>
+                    `;
+                            tbody.appendChild(row);
+                        });
+
+                        // Aggiunge gli event listener ai bottoni "Modifica"
+                        document.querySelectorAll('.edit-btn').forEach(button => {
+                            button.addEventListener('click', function () {
+                                var username = this.getAttribute('data-username');
+                                window.location.href = `administration.html?service=editUser&username=${username}`;
+                            });
+                        });
+                        document.querySelectorAll('.delete-btn').forEach(button => {
+                            button.addEventListener('click', function () {
+
+                                var username = this.getAttribute('data-username');
+                                const confirmDelete = confirm(`Sei sicuro di voler eliminare l'utente ${username}?`);
+
+                                if (!confirmDelete) {
+                                    return;
+                                } else {
+                                    deleteUserFromButton(username);
+
+                                }
+
+                            });
+                        });
+
+                    } else {
+                        alert(data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore:', error);
+                    alert('Errore nella richiesta: ' + error);
+                });
+        }
+
+        //Funzione per caricare i dati dell'utente
+        function loadUserData() {
+            var username = document.getElementById('username').value;
+
+            fetch('http://localhost:3000/api/getUser?username=' + username)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        document.getElementById('username').classList.add('readonly_field');
+                        document.getElementById('nome').value = data.user.nome;
+                        document.getElementById('cognome').value = data.user.cognome;
+                        document.getElementById('newPassword').value = "";
+                        document.getElementById('userData').style.display = 'block';
+                        document.getElementById('errorMessage').style.display = 'none';
+                        document.getElementById('carica_dati_button').style.display = 'none';
+                    } else if (data.code === 404) {
+                        document.getElementById('userData').style.display = 'none';
+                        document.getElementById('errorMessage').style.display = 'block';
+                    } else {
+                        alert("Errore: " + data.code + " - " + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore:', error);
+                    alert('Errore nella richiesta: ' + error);
+                });
+        }
+
+        // Funzione per inviare le modifiche dell'utente (editUser)
+        function editPassword(event) {
+            event.preventDefault();
+
+            var username = document.getElementById('username').value;
+            var newPassword = document.getElementById('newPassword').value;
+            console.log("Modifica password per l'utente: " + username);
+            console.log("Nuova password: " + newPassword);
+            // Controlla se sono presenti username e password
+            if (!username || !newPassword) {
+                alert('Nome utente e nuova password sono obbligatori');
+                return;
+            }
+
+            var updatedUserData = { username, newPassword };
+
+            fetch('http://localhost:3000/api/editPassword', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updatedUserData)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        alert(data.message);
+                        window.location.href = 'admin.html';
+                    } else {
+                        alert("Errore: " + data.code + " - " + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore:', error);
+                    alert('Errore nella richiesta: ' + error);
+                });
+        }
+
+        function deleteUser(event) {
+            event.preventDefault();
+            var username = document.getElementById('username').value;
+            console.log("Elimina l'utente: " + username);
+            if (!username) {
+                alert('Nome utente obbligatorio');
+                return;
+            }
+            var userData = { username };
+            fetch('http://localhost:3000/api/deleteUser', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        alert(data.message);
+                        window.location.href = 'admin.html';
+                    } else {
+                        alert("Errore: " + data.code + " - " + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore:', error);
+                    alert('Errore nella richiesta: ' + error);
+                });
+        }
+        function deleteUserFromButton(username) {
+            console.log("Elimina l'utente: " + username);
+            var userData = { username };
+            fetch('http://localhost:3000/api/deleteUser', {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(userData)
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.code === 200) {
+                        alert(data.message);
+                        window.location.reload();
+                    } else {
+                        alert("Errore: " + data.code + " - " + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Errore:', error);
+                    alert('Errore nella richiesta: ' + error);
+                });
+        }
+
+
+
+    </script>
+</body>
+
+</html>

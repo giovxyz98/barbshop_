@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tophair</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    
+</head>
+
+<body>
+    <header class="hero">
+        <div class="overlay">
+            <img src="logo.jpeg" alt="Tophair" class="logo">
+            <p>Tophair Barber Shop</p>
+        </div>
+    </header>
+	<main>
+	   </main>
+    <nav class="bottom-nav">
+        <a id="home"onclick="changePage('home')"><i class="fa fa-home"></i><span>Home</span></a>
+        <a id="prenota" onclick="changePage('prenota')"><i class="fa fa-calendar"></i><span>Prenota</span></a>
+        <a id="shop" class="active" ><i class="fa fa-store"></i><span>Shop</span></a>
+        <a id="profilo" onclick="changePage('profilo')"><i class="fa fa-user"></i><span>Profilo</span></a>
+    </nav>
+    
+    <script>
+        function changePage(id) {
+            window.location.href = id + ".html";
+        }
+    </script>
+    
+
+</body>
+
+</html>

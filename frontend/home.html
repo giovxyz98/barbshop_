@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="it">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tophair</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+
+</head>
+
+<body>
+    <header class="hero">
+        <div class="overlay">
+            <img src="logo.jpeg" alt="Tophair" class="logo">
+            <p>Tophair Barber Shop</p>
+        </div>
+    </header>
+    <main>
+        <div class="booking">
+            <p>Prenota qui il tuo servizio</p>
+            <button onclick="changePage('prenota')" class="btn">Prenota</button>
+        </div>
+        <h2>Orari del salone</h2>
+        <div class="hours">
+            <div id="giorni" class="schedule">
+                <div class="day open">
+                    <p>Martedì</p>
+                    <small>05/03/2024</small>
+                    <div class="orari">
+                        <div class="mattino">
+                            <span>Mattino:</span>
+                            09:00 - 13:00
+                        </div>
+                        <div class="pomeriggio">
+                            <span>Pomeriggio:</span>
+                            15:00 - 20:00
+                        </div>
+                    </div>
+                </div>
+                <div class="day closed">
+                    <p>Lunedì</p>
+                    <small>04/03/2024</small>
+                    <div class="orari">
+                        Chiuso
+                    </div>
+                </div>
+
+
+            </div>
+        </div>
+        </div>
+        <h2>Servizi</h2>
+        <div class="services">
+            <div class="service">
+                <p>Taglio</p>
+                <span>€ 10,00</span>
+            </div>
+            <div class="service">
+                <p>Barba</p>
+                <span>€ 5,00</span>
+            </div>
+            <div class="service">
+                <p>Sopracciglia</p>
+                <span>€ 3,00</span>
+            </div>
+            <div class="service">
+                <p>Completo</p>
+                <span>€ 18,00</span>
+            </div>
+
+
+    </main>
+
+    <nav class="bottom-nav">
+        <a id="home" class="active"><i class="fa fa-home"></i><span>Home</span></a>
+        <a id="prenota" onclick="changePage('prenota')"><i class="fa fa-calendar"></i><span>Prenota</span></a>
+        <a id="shop" onclick="changePage('shop')"><i class="fa fa-store"></i><span>Shop</span></a>
+        <a id="profilo" onclick="changePage('profilo')"><i class="fa fa-user"></i><span>Profilo</span></a>
+    </nav>
+
+    <script>
+        function getOrario(giorno) {
+            var orarioString = { "mattino": "", "pomeriggio": "" };
+
+            if (giorno.lavorativo_mattino == 1) {
+                var orario = giorno.orario_mattino;
+                var orarioInizio = orario.split("-")[0];
+                var orarioFine = orario.split("-")[1];
+                var orarioInizioOre = formatOrario(orarioInizio);
+                var orarioFineOre = formatOrario(orarioFine);
+                orarioString.mattino = orarioInizioOre + " - " + orarioFineOre;
+            } else {
+                orarioString.mattino = "Chiuso";
+            }
+
+            if (giorno.lavorativo_pomeriggio == 1) {
+                var orario = giorno.orario_pomeriggio;
+                var orarioInizio = orario.split("-")[0];
+                var orarioFine = orario.split("-")[1];
+                var orarioInizioOre = formatOrario(orarioInizio);
+                var orarioFineOre = formatOrario(orarioFine);
+                orarioString.pomeriggio = orarioInizioOre + " - " + orarioFineOre;
+
+            } else {
+                orarioString.pomeriggio = "Chiuso";
+            }
+
+            return orarioString;
+        }
+
+        function formatOrario(orario) {
+            var ore = Math.floor(orario / 60);
+            var minuti = orario % 60;
+            return (ore < 10 ? "0" + ore : ore) + ":" + (minuti < 10 ? "0" + minuti : minuti);
+        }
+
+
+
+        function changePage(id) {
+            window.location.href = id + ".html";
+        }
+        async function fetchGiorni() {
+            try {
+                const response = await fetch('http://localhost:3000/api/getGiorni');
+
+                const giorni = await response.json();
+                console.log(giorni[0]);
+                const scheduleContainer = document.getElementById('giorni');
+                scheduleContainer.innerHTML = '';
+
+                giorni.forEach(giorno => {
+                    var orario = getOrario(giorno);
+                    const dayDiv = document.createElement('div');
+                    dayDiv.classList.add('day');
+
+                    const isClosed = !giorno.lavorativo_mattino && !giorno.lavorativo_pomeriggio;
+                    dayDiv.classList.add(isClosed ? 'closed' : 'open');
+
+                    dayDiv.innerHTML = `
+                <p>${giorno.nome}</p>
+                <small>${giorno.data}</small>
+                <strong>Mattino:</strong> ${orario.mattino}<br>
+                <strong>Pomeriggio:</strong> ${orario.pomeriggio}
+            `;
+
+                    scheduleContainer.appendChild(dayDiv);
+                });
+            } catch (error) {
+                console.error("Errore nel recupero dei giorni:", error);
+            }
+        }
+
+        fetchGiorni();
+    </script>
+
+
+</body>
+
+</html>
