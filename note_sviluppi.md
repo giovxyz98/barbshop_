@@ -18,6 +18,7 @@
 - Login fittizio per debug (qualsiasi credenziale; ruolo `admin` se lo username inizia per "admin").
 - Stile art déco su `frontend/`; `home.html` legge gli orari da `/api/calendario`.
 - Abbonamento tolto dal progetto (si valuta la licenza). L'admin inserisce prenotazioni per conto di un cliente (`da_admin: true` salta il preavviso minimo, `?admin=1` su `/disponibilita`) e annulla qualsiasi prenotazione. Il flag `da_admin` oggi non è protetto: va legato al ruolo con l'auth reale.
+- Foto dei prodotti: caricabili anche da telefono e salvate nel database (BLOB), ridotte dal browser a 1280 px; formato riconosciuto dai byte, massimo 6 MB. Il database contiene ora anche le foto: conviene non tenerlo in git.
 - Backend completato per il front-end: prodotti (CRUD), richieste di registrazione (invio, accetta, rifiuta), modifica/eliminazione servizi, login di debug che crea l'utente se manca, front-end servito dallo stesso server.
 - Front-end rifatto con le nuove logiche, senza più mattino/pomeriggio. Cliente: login, richiesta di registrazione, home (prenotazioni attive con annullamento, servizi, orari), prenota (servizio → giorno da `/calendario` → orario con selettore unico → conferma), shop (catalogo con categorie), profilo (cambio password, storico, elimina account, logout), FAQ. Admin: agenda (attive/storico, filtri data e nome), servizi, prodotti, orari (settimana a fasce, eccezioni, impostazioni), utenti (richieste da accettare/rifiutare, aggiungi, modifica, elimina). Libreria comune in `frontend/app.js`, nome del locale in `frontend/brand.js`.
 

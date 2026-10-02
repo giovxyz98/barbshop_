@@ -2,11 +2,9 @@ const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const { openDb } = require('./db');
-const { uploadRouter, pulisciOrfani } = require('./upload');
+const { importaImmaginiDaFile } = require('./upload');
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads');
-
-function createApp(db, { uploadDir = UPLOAD_DIR } = {}) {
+function createApp(db) {
   const app = express();
   app.use(cors());
   app.use(express.json());
@@ -14,19 +12,12 @@ function createApp(db, { uploadDir = UPLOAD_DIR } = {}) {
   app.use('/api', require('./auth')(db));
   app.use('/api', require('./users')(db));
   app.use('/api', require('./servizi')(db));
-  app.use('/api', require('./prodotti')(db, uploadDir));
-  app.use('/api', uploadRouter(uploadDir));
+  app.use('/api', require('./prodotti')(db));
   app.use('/api', require('./registrazioni')(db));
   app.use('/api', require('./agenda_routes')(db));
 
   // API sconosciuta: JSON, non la pagina HTML di default
   app.use('/api', (req, res) => res.status(404).json({ error: 'Risorsa non trovata' }));
-
-  // Foto dei prodotti caricate dall'admin
-  app.use('/uploads', express.static(uploadDir, {
-    fallthrough: false, immutable: true, maxAge: '7d',
-    setHeaders: res => res.setHeader('X-Content-Type-Options', 'nosniff'),
-  }));
 
   // Il front-end è servito dallo stesso server: http://localhost:3000
   app.use(express.static(path.join(__dirname, '..', 'frontend')));
@@ -45,6 +36,8 @@ module.exports = { createApp };
 if (require.main === module) {
   const port = Number(process.env.PORT) || 3000;
   const db = openDb();
-  pulisciOrfani(db, UPLOAD_DIR);
+  // le foto caricate con la versione precedente (file in uploads/) passano nel database
+  const importate = importaImmaginiDaFile(db, process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads'));
+  if (importate) console.log(`Foto dei prodotti importate nel database: ${importate}`);
   createApp(db).listen(port, () => console.log(`Server in ascolto su http://localhost:${port}`));
 }

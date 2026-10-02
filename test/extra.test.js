@@ -31,7 +31,9 @@ test('prodotti: CRUD, vetrina solo disponibili, validazione', async t => {
 
   r = await call('PUT', `/prodotti/${id}`, { nome: 'Cera forte', categoria: 'Prodotti per capelli', prezzo: 14, disponibile: true });
   assert.equal(r.body.prodotto.nome, 'Cera forte');
-  assert.equal(r.body.prodotto.immagine, null);
+  assert.equal(r.body.prodotto.immagine, 'https://example.com/a.jpg', 'senza il campo immagine la foto resta com\'è');
+  r = await call('PUT', `/prodotti/${id}`, { nome: 'Cera forte', categoria: 'Prodotti per capelli', prezzo: 14, immagine: null });
+  assert.equal(r.body.prodotto.immagine, null, 'immagine: null la rimuove');
 
   assert.equal((await call('POST', '/prodotti', { prezzo: 5 })).status, 400);
   assert.equal((await call('POST', '/prodotti', { nome: 'X', prezzo: -1 })).status, 400);

@@ -38,10 +38,16 @@
             { name: 'disponibile', label: 'Visibile ai clienti', type: 'checkbox', value: p ? !!p.disponibile : true },
         ];
 
-        async function salva(id, v) {
-            const body = { nome: v.nome.trim(), categoria: v.categoria.trim(), descrizione: v.descrizione.trim(), prezzo: Number(v.prezzo), immagine: v.immagine, disponibile: v.disponibile };
+        // Salva i dati del prodotto e poi la sua foto (che vive nel database, in una richiesta a parte).
+        // aCreato(id) avvisa il chiamante dell'id appena creato: se la foto fallisce e si riprova, si aggiorna lo stesso prodotto.
+        async function salva(id, v, aCreato) {
+            const body = { nome: v.nome.trim(), categoria: v.categoria.trim(), descrizione: v.descrizione.trim(), prezzo: Number(v.prezzo), disponibile: v.disponibile };
             const r = id ? await api('PUT', `/prodotti/${id}`, body) : await api('POST', '/prodotti', body);
             if (!r.ok) return r.error;
+            const idProdotto = id || r.data.prodotto.id;
+            if (!id && aCreato) aCreato(idProdotto);
+            const errFoto = await salvaFotoProdotto(idProdotto, v.immagine);
+            if (errFoto) return `Prodotto salvato, ma la foto non è stata caricata: ${errFoto}`;
             toast(id ? 'Prodotto aggiornato' : 'Prodotto aggiunto');
         }
 
@@ -69,7 +75,9 @@
         }
 
         $('#nuovo').onclick = async () => {
-            if (await formModal({ title: 'Nuovo prodotto', fields: campi(null), submitText: 'Aggiungi', onSubmit: v => salva(null, v) })) carica();
+            let creato = null;   // id del prodotto già creato se la foto è fallita e si riprova
+            const ok = await formModal({ title: 'Nuovo prodotto', fields: campi(null), submitText: 'Aggiungi', onSubmit: v => salva(creato, v, id => { creato = id; }) });
+            if (ok || creato) carica();
         };
 
         $('#lista').addEventListener('click', async e => {

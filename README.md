@@ -47,7 +47,7 @@ Un salone = un'agenda unica (niente più operatori in parallelo).
 | GET/POST | `/getServizi`, `/getServizio?id=`, `/addServizio` | servizi |
 | PUT/DELETE | `/servizi/:id` | modifica; elimina (409 se già prenotato) |
 | GET/POST/PUT/DELETE | `/prodotti`, `/prodotti/:id` | catalogo (`?tutti=1` include i nascosti) |
-| POST | `/upload/immagine` (corpo = byte dell'immagine) | carica una foto (JPEG, PNG, WebP, GIF, max 6 MB) e restituisce `{ url: "/uploads/….jpg" }` da mettere in `immagine` del prodotto |
+| PUT/DELETE/GET | `/prodotti/:id/immagine` | foto del prodotto, salvata nel database: `PUT` con i byte dell'immagine nel corpo (JPEG, PNG, WebP, GIF, max 6 MB), `DELETE` la toglie, `GET` la serve. Il campo `immagine` del prodotto contiene l'indirizzo con la versione (`?v=`), così il browser la tiene in cache finché non cambia |
 | POST | `/registrazioni` | il cliente invia la richiesta di registrazione |
 | GET | `/registrazioni?stato=` | richieste (default: in attesa) |
 | POST | `/registrazioni/:id/accetta`, `/registrazioni/:id/rifiuta` | l'admin decide; accettando si crea l'utente `cliente` |
@@ -60,7 +60,7 @@ Gli orari sono sempre `HH:MM`, le date `YYYY-MM-DD`; gli errori rispondono `{ "e
 
 - `backend/` – `server.js`, `db.js` (apertura, migrazione, transazioni), `agenda.js` (logica di business), `agenda_routes.js`, `users.js`, `servizi.js`, `prodotti.js`, `registrazioni.js`, `auth.js`
 - `db/` – `database.db` e `schema.sql`
-- `uploads/` – foto dei prodotti caricate dall'admin (ignorata da git; `UPLOAD_DIR` per cambiare cartella). Il browser riduce la foto a 1280 px prima di inviarla, il server riconosce il formato dai byte e all'avvio elimina i file non associati a un prodotto
+- Le foto dei prodotti stanno nel database (tabella `prodotti_immagini`): un solo file da copiare per il backup. Il browser le riduce a 1280 px prima di inviarle e il server riconosce il formato dai byte. Le foto salvate come file dalla versione precedente (cartella `uploads/`) vengono importate nel database all'avvio e i file eliminati
 - `test/` – test della logica, della concorrenza (più processi sullo stesso file), delle API e della migrazione
 - `log/log.js` – log applicativi (i `.txt` sono ignorati da git)
 - `frontend/` – pagine web: `app.js` (API, sessione, dialog, navigazione), `brand.js` (nome del locale), `style.css`; cliente: `index`, `registrati`, `home`, `prenota`, `shop`, `profilo`, `faq`; admin: `admin` (agenda), `admin_servizi`, `admin_prodotti`, `admin_orari`, `admin_utenti`

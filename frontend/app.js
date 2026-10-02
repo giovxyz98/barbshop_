@@ -68,7 +68,8 @@ async function api(method, path, body) {
 
 // ---------- immagini ----------
 
-// Le foto caricate hanno un indirizzo relativo (/uploads/...): con i file aperti da disco serve l'origine del backend.
+// Le foto dei prodotti sono nel database e si leggono da /api/prodotti/<id>/immagine: l'indirizzo è relativo,
+// quindi con i file aperti da disco (file://) serve l'origine del backend.
 const ORIGINE_API = API_BASE.startsWith('http') ? API_BASE.replace(/\/api$/, '') : '';
 const urlImmagine = u => (u && u.startsWith('/') ? ORIGINE_API + u : (u || ''));
 
@@ -99,45 +100,57 @@ async function ridimensionaImmagine(file, max = 1280, qualita = 0.85) {
     return new Promise((res, rej) => c.toBlob(b => (b ? res(b) : rej(new Error('Impossibile elaborare la foto'))), 'image/jpeg', qualita));
 }
 
-// Carica una foto e restituisce il suo indirizzo (/uploads/...). Lancia un Error con un testo leggibile.
-async function caricaImmagine(file) {
-    let blob;
+// Prepara una foto scelta dall'utente per l'invio. Lancia un Error con un testo leggibile.
+async function preparaImmagine(file) {
     try {
-        blob = await ridimensionaImmagine(file);
+        return await ridimensionaImmagine(file);
     } catch (e) {
-        // se il browser non riesce a rielaborarla, si invia l'originale solo se è già un formato accettato e abbastanza piccolo
-        if (/^image\/(jpeg|png|webp|gif)$/.test(file.type) && file.size <= MAX_UPLOAD) blob = file;
-        else throw new Error(e.message || 'Foto non utilizzabile');
+        // se il browser non riesce a rielaborarla, si usa l'originale solo se è un formato accettato e abbastanza piccolo
+        if (/^image\/(jpeg|png|webp|gif)$/.test(file.type) && file.size <= MAX_UPLOAD) return file;
+        throw new Error(e.message || 'Foto non utilizzabile');
     }
-    let r;
-    try {
-        r = await fetch(API_BASE + '/upload/immagine', { method: 'POST', headers: { 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
-    } catch (e) {
-        throw new Error('Server non raggiungibile. Controlla che sia avviato.');
-    }
-    const data = await r.json().catch(() => null);
-    if (!r.ok) throw new Error((data && data.error) || 'Caricamento non riuscito');
-    return data.url;
 }
 
-// Campo "foto" di un modulo: anteprima, scelta da fotocamera o galleria, rimozione. Il valore è l'indirizzo caricato.
+// Invia (blob) o rimuove (blob = null) la foto di un prodotto. Restituisce un testo d'errore oppure null.
+async function salvaFotoProdotto(id, { blob, rimuovi }) {
+    try {
+        if (blob) {
+            const r = await fetch(`${API_BASE}/prodotti/${id}/immagine`, { method: 'PUT', headers: { 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
+            if (!r.ok) return ((await r.json().catch(() => null)) || {}).error || 'Caricamento della foto non riuscito';
+        } else if (rimuovi) {
+            const r = await api('DELETE', `/prodotti/${id}/immagine`);
+            if (!r.ok) return r.error;
+        }
+        return null;
+    } catch (e) {
+        return 'Server non raggiungibile. Controlla che sia avviato.';
+    }
+}
+
+// Campo "foto" di un modulo: anteprima, scelta da fotocamera o galleria, rimozione.
+// Non invia nulla da solo: il suo valore è { blob, rimuovi } e lo invia chi salva il modulo (salvaFotoProdotto).
 function iniziaCampoImmagine(root, submit) {
-    const prev = $('.imgprev', root), file = $('input[type="file"]', root), val = $('input[type="hidden"]', root);
+    const prev = $('.imgprev', root), file = $('input[type="file"]', root), originale = $('input[type="hidden"]', root).value;
     const stato = $('.imgstato', root), clear = $('[data-img-clear]', root);
+    let blob = null, rimuovi = false, anteprima = null;
     const mostra = () => {
-        const u = urlImmagine(val.value);
+        const u = anteprima || (rimuovi ? '' : urlImmagine(originale));
         prev.style.backgroundImage = u ? `url("${u.replace(/"/g, '%22')}")` : '';
         prev.innerHTML = u ? '' : '<i class="fa fa-image"></i>';
-        clear.hidden = !val.value;
+        clear.hidden = !u;
     };
     file.addEventListener('change', async () => {
         const f = file.files[0];
         if (!f) return;
-        stato.textContent = 'Caricamento…';
+        stato.textContent = 'Preparo la foto…';
         submit.disabled = true;
         try {
-            val.value = await caricaImmagine(f);
-            stato.textContent = '';
+            blob = await preparaImmagine(f);
+            if (blob.size > MAX_UPLOAD) throw new Error('Foto troppo grande');
+            if (anteprima) URL.revokeObjectURL(anteprima);
+            anteprima = URL.createObjectURL(blob);
+            rimuovi = false;
+            stato.textContent = `Pronta (${Math.max(1, Math.round(blob.size / 1024))} KB): verrà salvata con il prodotto`;
         } catch (e) {
             stato.textContent = e.message;
         } finally {
@@ -146,7 +159,14 @@ function iniziaCampoImmagine(root, submit) {
             mostra();
         }
     });
-    clear.onclick = () => { val.value = ''; stato.textContent = ''; mostra(); };
+    clear.onclick = () => {
+        if (anteprima) { URL.revokeObjectURL(anteprima); anteprima = null; }
+        blob = null;
+        rimuovi = !!originale;
+        stato.textContent = '';
+        mostra();
+    };
+    root._stato = () => ({ blob, rimuovi });
     mostra();
 }
 
@@ -253,7 +273,8 @@ function formModal({ title, intro, fields, submitText = 'Salva', danger = false,
             const valori = {};
             fields.forEach(f => {
                 const el = form.elements[f.name];
-                valori[f.name] = f.type === 'checkbox' ? el.checked : el.value;
+                valori[f.name] = f.type === 'image' ? form.querySelector(`.imgfield[data-img="${f.name}"]`)._stato()
+                    : f.type === 'checkbox' ? el.checked : el.value;
             });
             submit.disabled = true;
             const problema = onSubmit ? await onSubmit(valori) : undefined;

@@ -137,3 +137,12 @@ CREATE TABLE IF NOT EXISTS richieste_registrazione (
 -- una sola richiesta in attesa per username
 CREATE UNIQUE INDEX IF NOT EXISTS uq_richiesta_in_attesa
   ON richieste_registrazione (username) WHERE stato = 'in_attesa';
+
+-- Foto dei prodotti, salvate nel database (già ridotte dal browser). Una per prodotto.
+-- versione = istante dell'ultima modifica: entra nell'indirizzo della foto e permette la cache lunga del browser.
+CREATE TABLE IF NOT EXISTS prodotti_immagini (
+  prodotto_id INTEGER PRIMARY KEY REFERENCES prodotti (id) ON DELETE CASCADE,
+  tipo TEXT NOT NULL CHECK (tipo IN ('image/jpeg', 'image/png', 'image/webp', 'image/gif')),
+  dati BLOB NOT NULL CHECK (length(dati) > 0 AND length(dati) <= 6291456),
+  versione INTEGER NOT NULL
+);
