@@ -2,22 +2,26 @@
 
 ## Decisioni
 - Abbandonata l'app Flutter (ultimo stato nel commit `old`): tutto in front-end web, sia admin sia cliente.
-- DB: SQLite integrato di Node (`node:sqlite`) al posto del pacchetto `sqlite3`.
+- DB: SQLite integrato di Node (`node:sqlite`) al posto del pacchetto `sqlite3`. Fatto.
+- Registrazione ibrida: il cliente invia una richiesta, l'admin la accetta o la rifiuta; l'admin può comunque aggiungere utenti a mano. Nessun login con Google.
+- Agenda unica per salone (niente multi-operatore, niente multi-salone per ora).
+- Niente più divisione fissa mattino/pomeriggio: orario settimanale a fasce + eccezioni per data, disponibilità calcolata al volo (niente tabella `giorno`, niente cron).
 - Rimane solo la logica di business (backend + db).
 
-## A che punto eravamo
-Backend funzionante (Express, porta 3000):
-- `users`: addUser, getUser, getUsers, editUser, editPassword, deleteUser, getUserForReservation
-- `servizi`: getServizi, getServizio, addServizio
-- `giorno`: getGiorni, getGiorno, modificaGiorno, modificaOrario; cron a mezzanotte mantiene 30 giorni
-- `prenotazioni`: available-slots (slot da 5 min) e book-slot (una prenotazione per utente al giorno)
-- DB: tabelle users, servizi, giorno, prenotazioni, salone; 20 utenti di prova, 8 servizi, 0 prenotazioni
-Flutter era a metà: login/registrazione senza chiamate al server, solo `getServizi` collegato.
+## Fatto
+- Schema nuovo (`db/schema.sql`) e migrazione automatica dal vecchio db (`backend/db.js`, `PRAGMA user_version`): `giorno` rimossa, `servizi.durata` intera, prenotazioni storiche convertite.
+- Logica dell'agenda in `backend/agenda.js` (orari, eccezioni, impostazioni, disponibilità, prenota, annulla, elenco) con API in `backend/agenda_routes.js`.
+- Prenotazione atomica (`BEGIN IMMEDIATE`) più trigger anti-sovrapposizione e indice univoco utente/giorno nel db.
+- Validazione completa di data, orario (HH:MM, dentro una fascia, sulla griglia degli slot, preavviso, finestra massima), servizio e utente.
+- Bug dello stress test risolti: doppie prenotazioni sullo stesso slot, limite "una al giorno" aggirato, giorno senza prenotazioni non prenotabile, orari non validi accettati, errori 500 al posto di 404.
+- Test (`npm test`, 28): logica, API, concorrenza con più processi sullo stesso file, migrazione. Verificato che i test di concorrenza falliscono se si tolgono transazione e vincoli del db.
+- Login fittizio per debug (qualsiasi credenziale; ruolo `admin` se lo username inizia per "admin").
+- Stile art déco su `frontend/`; `home.html` legge gli orari da `/api/calendario`.
 
 ## Da fare
-1. Migrare i moduli backend da `sqlite3` a `node:sqlite` (DatabaseSync, API sincrona); togliere `sqlite3` da package.json.
-2. Auth reale: `/login` usa credenziali fisse (`admin`/`password123`) e `logAccess` non è importato; password in chiaro (bcrypt è già nelle dipendenze); ruolo cliente/salone.
-3. Mancano API: prenotazioni per utente/storico/annullamento, prodotti, salone preferito, ricerca saloni, abbonamento, FAQ.
-4. `book-slot` è un POST ma legge dai query param; `getBookings` dà errore se il giorno non ha prenotazioni (bug: "Giorno non valido"); chiamate axios a localhost tra moduli da sostituire con funzioni.
-5. Tabella `giorno` senza `id` (lo schema vecchio lo prevedeva, `modificaGiorno` lo usa).
-6. Front-end admin e cliente da zero.
+1. Auth reale: sostituire il login fittizio, hash delle password (bcrypt è già nelle dipendenze; ora sono in chiaro e `getUsers`/`getUser` le restituiscono), sessione/token e protezione delle rotte admin (oggi tutte le API sono aperte).
+2. Richieste di registrazione: tabella (es. `richieste_registrazione` con stato in attesa/accettata/rifiutata), API per inviare, elencare, accettare (crea l'utente) e rifiutare; ruolo `cliente` in `users`; sezione admin per gestirle.
+3. Mancano API: prodotti (catalogo e prenotazione prodotti), salone preferito e ricerca saloni, abbonamento, FAQ, modifica/eliminazione servizi.
+4. Front-end admin e cliente da zero sopra queste API: prenota (servizio → giorno da `/calendario` → orario da `/disponibilita`), agenda admin con filtri, gestione orari ed eccezioni.
+5. Notifiche/promemoria (email o SMS) e storico: per ora `GET /prenotazioni?da=&a=` copre l'elenco.
+6. Se in futuro serviranno più saloni: `salone_id` su prenotazioni, orari, servizi e utenti. Non fatto di proposito.
