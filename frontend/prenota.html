@@ -20,6 +20,7 @@
             <div class="steps" aria-hidden="true"><span id="s1"></span><span id="s2"></span><span id="s3"></span></div>
 
             <h2>1 · Scegli il servizio</h2>
+            <p id="giornoScelto" class="muted" style="margin-top:0" hidden></p>
             <div id="servizi" class="stack"></div>
 
             <section id="secGiorno" hidden>
@@ -71,7 +72,11 @@
 
         function aggiornaPassi() {
             el('s1').classList.toggle('done', !!st.servizio);
-            el('s2').classList.toggle('done', !!st.data);
+            el('s2').classList.toggle('done', !!(st.servizio && st.data));
+            // giorno arrivato dalla home ma servizio non ancora scelto
+            const avviso = el('giornoScelto');
+            avviso.hidden = !(st.data && !st.servizio);
+            if (!avviso.hidden) avviso.innerHTML = `Giorno scelto: <strong>${esc(fmtDataLunga(st.data))}</strong>. Scegli ora il servizio: potrai cambiare giorno dal calendario.`;
             el('s3').classList.toggle('done', !!st.ora);
         }
 
@@ -93,8 +98,14 @@
             renderServizi();
             el('secGiorno').hidden = !st.servizio;
             if (!st.servizio) return;
-            if (!st.anno) { const t = new Date(); st.anno = t.getFullYear(); st.mese = t.getMonth(); }
+            if (!st.anno) { const t = st.data ? parseISO(st.data) : new Date(); st.anno = t.getFullYear(); st.mese = t.getMonth(); }
             await renderCalendario();
+            // il giorno ricevuto dall'indirizzo deve essere ancora prenotabile; altrimenti si ricomincia dal calendario
+            if (st.data && st.data.startsWith(`${st.anno}-${pad(st.mese + 1)}`) && !st.aperti.has(st.data)) {
+                st.data = null;
+                toast('Il giorno scelto non è prenotabile: scegline un altro', 'err');
+                await renderCalendario();
+            }
             if (st.data) await caricaSlot(); else { el('secOrario').hidden = true; aggiornaRiepilogo(); }
             aggiornaPassi();
         }
@@ -115,6 +126,7 @@
             const da = primoMese < oggi ? oggi : primoMese;
             const a = ultimoMese > ultimo ? ultimo : ultimoMese;
             const aperti = new Set();
+            st.aperti = aperti;
             if (da <= a) {
                 const r = await api('GET', `/calendario?da=${da}&a=${a}`);
                 if (!r.ok) { el('cal').innerHTML = emptyHtml('fa-triangle-exclamation', r.error); return; }
@@ -261,7 +273,11 @@
             if (!sv.ok) { el('servizi').innerHTML = emptyHtml('fa-scissors', sv.status === 404 ? 'Nessun servizio disponibile al momento.' : sv.error); return; }
             st.servizi = sv.data.data;
             renderServizi();
-            const preset = Number(new URLSearchParams(location.search).get('servizio'));
+            const params = new URLSearchParams(location.search);
+            // ?data=YYYY-MM-DD (dalla home): giorno già scelto; vale solo se è futuro e dentro la finestra di prenotazione
+            const dataParam = params.get('data');
+            if (dataParam && /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(dataParam) && dataParam >= todayISO() && dataParam <= addDaysISO(todayISO(), st.finestra)) st.data = dataParam;
+            const preset = Number(params.get('servizio'));
             if (preset) scegliServizio(preset);
             aggiornaPassi();
         })();

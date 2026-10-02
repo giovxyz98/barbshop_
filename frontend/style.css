@@ -582,3 +582,7 @@ details.faq p { color: var(--muted); margin: 10px 0 2px; }
 }
 .opt:hover, .opt:focus-visible { background: var(--gold-faint); border-color: var(--gold-dim); outline: none; }
 .opt.sel { background-image: linear-gradient(135deg, var(--gold-soft), var(--gold)); color: var(--bg); }
+
+/* giorni aperti cliccabili nella home */
+a.day { text-decoration: none; color: var(--text); cursor: pointer; transition: transform .2s, border-color .2s; }
+a.day:hover, a.day:focus-visible { transform: translateY(-3px); border-color: var(--gold); outline: none; }

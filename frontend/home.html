@@ -93,11 +93,15 @@
             box.innerHTML = r.data.giorni.map(g => {
                 const [y, m, d] = g.data.split('-');
                 const orari = g.aperto ? g.fasce.map(f => `<span>${esc(f.apertura)} – ${esc(f.chiusura)}</span>`).join('') : 'Chiuso';
-                return `<div class="day ${g.aperto ? 'open' : 'closed'} ${g.data === da ? 'today' : ''}">
+                const classi = `day ${g.aperto ? 'open' : 'closed'} ${g.data === da ? 'today' : ''}`;
+                const corpo = `
                     <p>${esc(NOMI_GIORNO[g.giorno_settimana])}</p>
                     <small>${d}/${m}</small>
-                    <div class="orari">${orari}</div>
-                </div>`;
+                    <div class="orari">${orari}</div>`;
+                // i giorni aperti portano alla prenotazione con il giorno già scelto
+                return g.aperto
+                    ? `<a class="${classi}" href="prenota.html?data=${g.data}" aria-label="Prenota ${esc(NOMI_GIORNO[g.giorno_settimana])} ${d}/${m}">${corpo}</a>`
+                    : `<div class="${classi}">${corpo}</div>`;
             }).join('');
         }
 
