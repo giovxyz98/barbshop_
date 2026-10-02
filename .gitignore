@@ -2,3 +2,6 @@ node_modules/
 log/*.txt
 *.db-journal
 uploads/
+# il database (utenti, prenotazioni, foto) non va in git: si crea da db/schema.sql al primo avvio
+db/*.db
+db/*.db-*

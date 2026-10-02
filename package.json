@@ -10,7 +10,8 @@
   "scripts": {
     "start": "node backend/server.js",
     "dev": "nodemon backend/server.js",
-    "test": "node --no-warnings --test --test-concurrency=1 test/*.test.js"
+    "test": "node --no-warnings --test --test-concurrency=1 test/*.test.js",
+    "seed": "node db/seed.js"
   },
   "engines": {
     "node": ">=22.13"

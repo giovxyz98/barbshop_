@@ -71,8 +71,11 @@ Gli orari sono sempre `HH:MM`, le date `YYYY-MM-DD`; gli errori rispondono `{ "e
 ```
 npm install
 npm start        # apri http://localhost:3000  (PORT e DB_PATH configurabili via variabili d'ambiente)
+npm run seed     # facoltativo: dati di esempio (20 utenti, 8 servizi)
 npm test
 ```
+
+Il database (`db/database.db`) non è in git: contiene utenti, prenotazioni e foto. Si crea da solo da `db/schema.sql` al primo avvio; per salvarlo basta copiare quel file.
 
 Dal telefono (stessa rete Wi-Fi del computer) apri `http://<indirizzo-del-computer>:3000`; il front-end usa lo stesso indirizzo anche per le API, quindi la gestione dei prodotti e il caricamento delle foto funzionano anche da mobile. Su Windows può servire consentire la porta 3000 nel firewall.
 
