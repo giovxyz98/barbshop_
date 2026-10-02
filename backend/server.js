@@ -1,42 +1,27 @@
 const express = require('express');
 const cors = require('cors');
-const cron = require('node-cron');
+const { openDb } = require('./db');
 
-const { logEvent } = require('../log/log');
+function createApp(db) {
+  const app = express();
+  app.use(cors());
+  app.use(express.json());
 
-const app = express();
-const port = 3000;
+  app.use('/api', require('./auth'));
+  app.use('/api', require('./users')(db));
+  app.use('/api', require('./servizi')(db));
+  app.use('/api', require('./agenda_routes')(db));
 
-app.use(cors());
-app.use(express.json()); 
+  // JSON malformato e simili: risposta JSON invece della pagina HTML di default
+  app.use((err, req, res, next) => {
+    res.status(err.status || 500).json({ error: err.status && err.status < 500 ? 'Richiesta non valida' : 'Errore interno' });
+  });
+  return app;
+}
 
-const { updateGiornoTable } = require('./giorno');  // Importa la funzione dal modulo 'giorno'
+module.exports = { createApp };
 
-const giornoRoutes = require('./giorno');
-const authRoutes = require('./auth');
-const usersRoutes = require('./users');
-const prenotazioneRoutes = require('./prenotazioni');
-const serviziRoutes = require('./servizi');
-
-app.use('/api', giornoRoutes);
-app.use('/api', authRoutes);
-app.use('/api', usersRoutes);
-app.use('/api', prenotazioneRoutes);
-app.use('/api', serviziRoutes);
-
-app.listen(port, () => {
-  console.log(`Server in ascolto su http://localhost:${port}`);
-});
-
-cron.schedule('0 0 * * *', () => {
-  try {
-    updateGiornoTable();
-    logEvent("Tabella giorno aggiornata" + " - Success");
-  } catch (err) {
-    logEvent("Errore nell'aggiornamento della tabella giorno: " + err.message + " - Error");
-  }
-}, {
-  scheduled: true,
-  timezone: "Europe/Rome" 
-  
-});
+if (require.main === module) {
+  const port = Number(process.env.PORT) || 3000;
+  createApp(openDb()).listen(port, () => console.log(`Server in ascolto su http://localhost:${port}`));
+}

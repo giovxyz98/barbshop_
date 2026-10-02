@@ -1,40 +1,18 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
-const { logEvent } = require('../log/log');
+const { logAccess } = require('../log/log');
 const router = express.Router();
 
-const db = new sqlite3.Database('../db/database.db', (err) => {
-  if (err) {
-    logEvent("Errore nell'apertura del database: " + err.message);
-  }
-});
-
+// LOGIN FITTIZIO (debug): accetta qualsiasi credenziale, anche vuota, senza leggere il database.
+// Il ruolo è "admin" se lo username inizia per "admin", altrimenti "cliente".
+// Da sostituire con l'autenticazione reale (vedi note_sviluppi.md).
 router.post('/login', (req, res) => {
-  const { username, password } = req.body;
+  const username = (req.body && req.body.username) || 'debug';
+  const ruolo = username.toLowerCase().startsWith('admin') ? 'admin' : 'cliente';
 
-  // Dati utente di esempio
-  const user = { username: 'admin', password: 'password123' };
-
-  // Otteniamo l'indirizzo IP dell'utente (questa volta usando req.connection.remoteAddress)
-  const ip = req.ip;
   const now = new Date();
-  const date = now.toLocaleDateString('it-IT');
-  const time = now.toLocaleTimeString('it-IT');
+  logAccess(`{"timestamp": "${now.toLocaleDateString('it-IT')} ${now.toLocaleTimeString('it-IT')}", "ip":"${req.ip}", "Username": "${username}", "code":"200","message":"Success (debug)"}`);
 
-  // Log del tentativo di login
-  let logMessage = `{"timestamp": "${date} ${time}", "ip":"${ip}", "Username": "${username}",`;
-
-  // Controlliamo le credenziali
-  if (username === user.username && password === user.password) {
-    logMessage += '"code":"200","message":"Success"';
-    res.status(200).json({ message: 'Success' });
-  } else {
-    logMessage += '"code":"401","message":"Failed"';
-
-    res.status(401).json({ message: 'Failed' });
-  }
-  logMessage += "}";
-  logAccess(logMessage);
+  res.status(200).json({ message: 'Success', debug: true, user: { username, ruolo } });
 });
 
 module.exports = router;

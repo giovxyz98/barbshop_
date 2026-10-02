@@ -1,100 +1,45 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
 const { logEvent } = require('../log/log');
-const router = express.Router();
 
-const db = new sqlite3.Database('../db/database.db', (err) => {
-    if (err) {
-        logEvent("Errore nell'apertura del database: " + err.message + " - Error");
+module.exports = db => {
+  const router = express.Router();
+
+  const safe = (fn, label) => (req, res) => {
+    try {
+      fn(req, res);
+    } catch (e) {
+      logEvent(`Errore in "${label}": ${e.message} - Error`);
+      res.status(500).json({ code: 500, message: 'Errore interno del server', error: e.message });
     }
-});
+  };
 
-// Funzione per ottenere i servizi
-router.get('/getServizi', (req, res) => {
-    db.all('SELECT * FROM servizi', (err, rows) => {
-        if (err) {
-            logEvent(`Errore nel recupero dei servizi: ${err.message} - Error`);
-            return res.status(500).json({
-                code: 500,
-                message: 'Errore interno del server',
-                error: err.message
-            });
-        }
+  router.get('/getServizi', safe((req, res) => {
+    const rows = db.prepare('SELECT * FROM servizi ORDER BY id').all();
+    if (rows.length === 0) return res.status(404).json({ code: 404, message: 'Nessun servizio trovato' });
+    res.status(200).json({ code: 200, message: 'Success', data: rows });
+  }, 'getServizi'));
 
-        if (rows.length === 0) {
-            return res.status(404).json({
-                code: 404,
-                message: 'Nessun servizio trovato'
-            });
-        }
+  router.get('/getServizio', safe((req, res) => {
+    const id = Number(req.query.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: 'Id servizio non valido' });
+    const row = db.prepare('SELECT * FROM servizi WHERE id = ?').get(id);
+    if (!row) return res.status(404).json({ message: 'Servizio non trovato' });
+    res.status(200).json({ message: 'Success', data: row });
+  }, 'getServizio'));
 
-        return res.status(200).json({
-            code: 200,
-            message: 'Success',
-            data: rows
-        });
-    });
-});
-
-router.post('/addServizio', (req, res) => {
-    const { nome, descrizione, prezzo, durata, feedback } = req.body;
-    if (!nome) {
-        return res.status(400).json({
-            message: 'Inserire il nome del servizio'
-        });
+  router.post('/addServizio', safe((req, res) => {
+    const { nome, descrizione, prezzo, durata, feedback } = req.body || {};
+    if (!nome) return res.status(400).json({ message: 'Inserire il nome del servizio' });
+    if (prezzo === undefined || prezzo === '' || !(Number(prezzo) >= 0)) {
+      return res.status(400).json({ message: 'Inserire un prezzo valido' });
     }
-    if (!prezzo) {
-        return res.status(400).json({
-            message: 'Inserire il prezzo del servizio'
-        })
+    if (!Number.isInteger(Number(durata)) || Number(durata) <= 0) {
+      return res.status(400).json({ message: 'Inserire la durata del servizio in minuti (intero > 0)' });
     }
-    if (!durata) {
-        return res.status(400).json({
-            message: 'Inserire la durata del servizio'
-        })
-    }
-    db.run('INSERT INTO servizi (nome, descrizione, prezzo, durata, feedback) VALUES (?, ?, ?, ?, ?)', [nome, descrizione, prezzo, durata, feedback], function (err) {
-        if (err) {
-            logEvent(`Errore nell'inserimento del servizio: ${err.message} - Error`);
-            return res.status(500).json({
-                message: 'Errore interno del server',
-                error: err.message
-            });
-        }
+    const r = db.prepare('INSERT INTO servizi (nome, descrizione, prezzo, durata, feedback) VALUES (?, ?, ?, ?, ?)')
+      .run(nome, descrizione ?? null, Number(prezzo), Number(durata), feedback ?? null);
+    res.status(200).json({ message: 'Servizio aggiunto con successo', id: Number(r.lastInsertRowid) });
+  }, 'addServizio'));
 
-        return res.status(200).json({
-            message: 'Servizio aggiunto con successo',
-            id: this.lastID
-        });
-    });
-});
-// Funzione per ottenere un servizio
-router.get('/getServizio', (req, res) => {
-    const id = req.query.id;
-
-    db.get('SELECT * FROM servizi WHERE id = ?', [id], (err, row) => {
-        if (err) {
-            logEvent(`Errore nel recupero del servizio: ${err.message} - Error`);
-            return res.status(500).json({
-                message: 'Errore interno del server',
-                error: err.message
-            });
-        }
-
-        if (!row) {
-            return res.status(404).json({
-
-                message: 'Servizio non trovato'
-            });
-        }
-
-        return res.status(200).json({
-            message: 'Success',
-            data: row
-        });
-    });
-});
-
-
-
-module.exports = router;
+  return router;
+};

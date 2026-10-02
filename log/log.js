@@ -4,6 +4,7 @@ const path = require('path');
 
 // Funzione per salvare i log di info
 function logEvent(message) {
+  if (process.env.NO_LOG) return;
   const now = new Date();
   const date = now.toLocaleDateString('it-IT');
   const time = now.toLocaleTimeString('it-IT');
