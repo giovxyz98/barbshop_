@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="it" data-titolo="Orari">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <script src="brand.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="header"></div>
+    <main class="page">
+        <h1>Orari</h1>
+
+        <div class="section-title">
+            <h2>Orario settimanale</h2>
+            <button type="button" id="salvaSett" disabled>Salva</button>
+        </div>
+        <p class="muted" style="margin-top:0">Una o più fasce per giorno (ad esempio mattina e pomeriggio). Un giorno senza fasce è chiuso.</p>
+        <div id="settimana" class="stack"></div>
+        <div id="erroreSett" class="form-error" role="alert"></div>
+
+        <div class="section-title">
+            <h2>Chiusure ed eccezioni</h2>
+            <button type="button" id="nuovaEcc" class="btn-ghost"><i class="fa fa-plus"></i> Aggiungi</button>
+        </div>
+        <p class="muted" style="margin-top:0">Ferie, festività o orari speciali per una data precisa: sostituiscono l'orario settimanale di quel giorno.</p>
+        <div id="eccezioni" class="stack"></div>
+
+        <h2>Impostazioni prenotazioni</h2>
+        <form id="impForm" class="card" novalidate>
+            <div class="field">
+                <label for="slot_step">Passo degli orari (minuti)</label>
+                <input id="slot_step" type="number" min="1" max="120" step="1" required>
+                <span class="muted" style="font-size:.75rem">Ogni quanti minuti si offre un orario di inizio (es. 15 → 9:00, 9:15, 9:30…).</span>
+            </div>
+            <div class="field">
+                <label for="anticipo_minimo">Preavviso minimo (minuti)</label>
+                <input id="anticipo_minimo" type="number" min="0" step="5" required>
+                <span class="muted" style="font-size:.75rem">Quanto prima di un orario si smette di accettare prenotazioni nello stesso giorno.</span>
+            </div>
+            <div class="field">
+                <label for="finestra_giorni">Si può prenotare fino a (giorni)</label>
+                <input id="finestra_giorni" type="number" min="1" max="730" step="1" required>
+            </div>
+            <div id="erroreImp" class="form-error" role="alert"></div>
+            <button type="submit" class="block">Salva impostazioni</button>
+        </form>
+    </main>
+    <nav id="nav"></nav>
+
+    <script src="app.js"></script>
+    <script>
+        const user = initPage('admin', 'orari');
+        const ORDINE = [1, 2, 3, 4, 5, 6, 0];      // si mostra da lunedì a domenica
+        let sett = [];                              // [{giorno_settimana, fasce:[{apertura, chiusura}]}]
+        let eccezioni = [];
+        let modificato = false;
+
+        const giorno = g => sett.find(x => x.giorno_settimana === g);
+
+        function segnaModificato(v) { modificato = v; $('#salvaSett').disabled = !v; }
+
+        // ----- orario settimanale -----
+        function renderSettimana() {
+            $('#settimana').innerHTML = ORDINE.map(g => {
+                const d = giorno(g);
+                const fasce = d.fasce.map((f, i) => `
+                    <div class="fascia">
+                        <input type="time" value="${esc(f.apertura)}" data-g="${g}" data-i="${i}" data-k="apertura" aria-label="Apertura ${NOMI_GIORNO[g]}">
+                        <span class="muted">–</span>
+                        <input type="time" value="${esc(f.chiusura)}" data-g="${g}" data-i="${i}" data-k="chiusura" aria-label="Chiusura ${NOMI_GIORNO[g]}">
+                        <button type="button" class="btn-danger btn-small btn-icon" data-rimuovi="${g}:${i}" aria-label="Rimuovi fascia"><i class="fa fa-xmark"></i></button>
+                    </div>`).join('');
+                return `<div class="dayrow ${d.fasce.length ? '' : 'closed'}">
+                    <div class="row between">
+                        <span class="dname">${esc(NOMI_GIORNO[g])}</span>
+                        ${d.fasce.length ? '' : '<span class="badge off">Chiuso</span>'}
+                        <button type="button" class="btn-ghost btn-small" data-aggiungi="${g}"><i class="fa fa-plus"></i> Fascia</button>
+                    </div>
+                    ${fasce}
+                </div>`;
+            }).join('');
+        }
+
+        $('#settimana').addEventListener('click', e => {
+            const add = e.target.closest('[data-aggiungi]');
+            const rem = e.target.closest('[data-rimuovi]');
+            if (add) {
+                const d = giorno(Number(add.dataset.aggiungi));
+                const ultima = d.fasce[d.fasce.length - 1];
+                d.fasce.push(ultima ? { apertura: ultima.chiusura, chiusura: '20:00' } : { apertura: '09:00', chiusura: '13:00' });
+            } else if (rem) {
+                const [g, i] = rem.dataset.rimuovi.split(':').map(Number);
+                giorno(g).fasce.splice(i, 1);
+            } else return;
+            segnaModificato(true);
+            renderSettimana();
+        });
+
+        $('#settimana').addEventListener('change', e => {
+            const inp = e.target.closest('input[data-k]');
+            if (!inp) return;
+            giorno(Number(inp.dataset.g)).fasce[Number(inp.dataset.i)][inp.dataset.k] = inp.value;
+            segnaModificato(true);
+        });
+
+        $('#salvaSett').onclick = async () => {
+            const err = $('#erroreSett');
+            err.textContent = '';
+            const incompleta = sett.some(d => d.fasce.some(f => !f.apertura || !f.chiusura));
+            if (incompleta) { err.textContent = 'Compila apertura e chiusura di tutte le fasce'; return; }
+            const btn = $('#salvaSett');
+            btn.disabled = true;
+            const r = await api('PUT', '/orari/settimanali', { giorni: sett });
+            if (!r.ok) { err.textContent = r.error; btn.disabled = false; return; }
+            sett = r.data.settimanali;
+            segnaModificato(false);
+            renderSettimana();
+            toast('Orario settimanale salvato');
+        };
+
+        // ----- eccezioni -----
+        function descrizioneEccezione(x) {
+            return x.chiuso ? 'Chiuso' : x.fasce.map(f => `${f.apertura} – ${f.chiusura}`).join(' · ');
+        }
+
+        function renderEccezioni() {
+            $('#eccezioni').innerHTML = eccezioni.length ? eccezioni.map(x => `
+                <div class="item ${x.chiuso ? 'off' : ''}">
+                    <div class="when">${esc(fmtDataBreve(x.data))}<br>${esc(x.data.slice(0, 4))}</div>
+                    <div class="main">
+                        <div class="title">${esc(descrizioneEccezione(x))}</div>
+                        <div class="sub">${esc(x.motivo || '')}</div>
+                    </div>
+                    <div class="actions">
+                        <button type="button" class="btn-ghost btn-small btn-icon" data-ecc-edit="${esc(x.data)}" aria-label="Modifica"><i class="fa fa-pen"></i></button>
+                        <button type="button" class="btn-danger btn-small btn-icon" data-ecc-del="${esc(x.data)}" aria-label="Rimuovi"><i class="fa fa-trash"></i></button>
+                    </div>
+                </div>`).join('') : emptyHtml('fa-umbrella-beach', 'Nessuna chiusura o orario speciale in programma.');
+        }
+
+        async function formEccezione(x) {
+            const f1 = x && !x.chiuso ? x.fasce[0] : null;
+            const f2 = x && !x.chiuso ? x.fasce[1] : null;
+            const ok = await formModal({
+                title: x ? 'Modifica eccezione' : 'Nuova eccezione',
+                submitText: 'Salva',
+                fields: [
+                    { name: 'data', label: 'Data', type: 'date', required: true, value: x ? x.data : '', attrs: { min: todayISO() } },
+                    { name: 'tipo', label: 'Tipo', type: 'select', value: x && !x.chiuso ? 'orario' : 'chiuso', options: [{ value: 'chiuso', label: 'Chiuso tutto il giorno' }, { value: 'orario', label: 'Orario speciale' }] },
+                    { name: 'a1', label: 'Prima fascia · apertura', type: 'time', value: f1 ? f1.apertura : '' },
+                    { name: 'c1', label: 'Prima fascia · chiusura', type: 'time', value: f1 ? f1.chiusura : '' },
+                    { name: 'a2', label: 'Seconda fascia · apertura (facoltativa)', type: 'time', value: f2 ? f2.apertura : '' },
+                    { name: 'c2', label: 'Seconda fascia · chiusura', type: 'time', value: f2 ? f2.chiusura : '' },
+                    { name: 'motivo', label: 'Motivo (facoltativo)', value: x ? x.motivo : '', attrs: { maxlength: 80, placeholder: 'es. Ferie, Ferragosto' } },
+                ],
+                onSubmit: async v => {
+                    const body = { data: v.data, motivo: v.motivo.trim() || null };
+                    if (v.tipo === 'chiuso') body.chiuso = true;
+                    else {
+                        if (!v.a1 || !v.c1) return 'Indica apertura e chiusura della prima fascia';
+                        body.fasce = [{ apertura: v.a1, chiusura: v.c1 }];
+                        if (v.a2 || v.c2) {
+                            if (!v.a2 || !v.c2) return 'Completa apertura e chiusura della seconda fascia';
+                            body.fasce.push({ apertura: v.a2, chiusura: v.c2 });
+                        }
+                    }
+                    const r = await api('PUT', '/orari/eccezioni', body);
+                    if (!r.ok) return r.error;
+                    toast('Eccezione salvata');
+                    // avviso se esistono già prenotazioni in quel giorno
+                    const p = await api('GET', `/prenotazioni?data=${v.data}&stato=confermata`);
+                    if (p.ok && p.data.prenotazioni.length) {
+                        toast(`Attenzione: il ${fmtDataBreve(v.data)} ci sono già ${p.data.prenotazioni.length} prenotazioni confermate, da verificare in agenda.`, 'err');
+                    }
+                },
+            });
+            if (ok) caricaEccezioni();
+        }
+
+        $('#nuovaEcc').onclick = () => formEccezione(null);
+
+        $('#eccezioni').addEventListener('click', async e => {
+            const ed = e.target.closest('[data-ecc-edit]');
+            const del = e.target.closest('[data-ecc-del]');
+            if (ed) formEccezione(eccezioni.find(x => x.data === ed.dataset.eccEdit));
+            else if (del) {
+                const ok = await confirmDialog({ title: 'Rimuovere l\'eccezione?', message: `Il ${fmtDataLunga(del.dataset.eccDel)} tornerà valido l'orario settimanale.`, confirmText: 'Rimuovi', danger: true });
+                if (!ok) return;
+                const r = await api('DELETE', `/orari/eccezioni/${del.dataset.eccDel}`);
+                if (!r.ok) return toast(r.error, 'err');
+                toast('Eccezione rimossa');
+                caricaEccezioni();
+            }
+        });
+
+        async function caricaEccezioni() {
+            const r = await api('GET', `/orari?da=${todayISO()}`);
+            if (!r.ok) { $('#eccezioni').innerHTML = emptyHtml('fa-triangle-exclamation', r.error); return; }
+            eccezioni = r.data.eccezioni;
+            renderEccezioni();
+        }
+
+        // ----- impostazioni -----
+        $('#impForm').addEventListener('submit', async e => {
+            e.preventDefault();
+            const err = $('#erroreImp');
+            err.textContent = '';
+            if (!e.target.checkValidity()) { e.target.reportValidity(); return; }
+            const r = await api('PUT', '/impostazioni', {
+                slot_step: Number($('#slot_step').value),
+                anticipo_minimo: Number($('#anticipo_minimo').value),
+                finestra_giorni: Number($('#finestra_giorni').value),
+            });
+            if (!r.ok) { err.textContent = r.error; return; }
+            toast('Impostazioni salvate');
+        });
+
+        (async function avvia() {
+            if (!user) return;
+            $('#settimana').innerHTML = loadingHtml();
+            const r = await api('GET', `/orari?da=${todayISO()}`);
+            if (!r.ok) { $('#settimana').innerHTML = emptyHtml('fa-triangle-exclamation', r.error); return; }
+            sett = r.data.settimanali;
+            eccezioni = r.data.eccezioni;
+            renderSettimana();
+            renderEccezioni();
+            const i = r.data.impostazioni;
+            $('#slot_step').value = i.slot_step;
+            $('#anticipo_minimo').value = i.anticipo_minimo;
+            $('#finestra_giorni').value = i.finestra_giorni;
+        })();
+
+        window.addEventListener('beforeunload', e => { if (modificato) { e.preventDefault(); e.returnValue = ''; } });
+    </script>
+</body>
+
+</html>

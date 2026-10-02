@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="it" data-titolo="Utenti">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <script src="brand.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="header"></div>
+    <main class="page">
+        <h1>Utenti</h1>
+
+        <section id="boxRichieste" hidden>
+            <h2>Richieste di registrazione</h2>
+            <div id="richieste" class="stack"></div>
+        </section>
+
+        <div class="section-title">
+            <h2>Clienti e account</h2>
+            <button type="button" id="nuovo"><i class="fa fa-plus"></i> Nuovo</button>
+        </div>
+        <div class="toolbar"><input type="search" id="q" placeholder="Cerca per nome o username" aria-label="Cerca utenti"></div>
+        <p id="conteggio" class="muted" style="margin:0 0 10px"></p>
+        <div id="lista" class="stack"></div>
+    </main>
+    <nav id="nav"></nav>
+
+    <script src="app.js"></script>
+    <script>
+        const user = initPage('admin', 'utenti');
+        let utenti = [];
+
+        // ----- richieste -----
+        async function caricaRichieste() {
+            const r = await api('GET', '/registrazioni');
+            if (!r.ok) return;
+            const lista = r.data.richieste;
+            $('#boxRichieste').hidden = lista.length === 0;
+            setNavBadge('utenti', lista.length);
+            $('#richieste').innerHTML = lista.map(x => `
+                <div class="item">
+                    <div class="main">
+                        <div class="title">${esc(x.nome)} ${esc(x.cognome)}</div>
+                        <div class="sub"><span class="mono">@${esc(x.username)}</span> · ${esc(x.creata)}</div>
+                    </div>
+                    <div class="actions">
+                        <button type="button" class="btn-small" data-ok="${x.id}">Accetta</button>
+                        <button type="button" class="btn-danger btn-small" data-no="${x.id}">Rifiuta</button>
+                    </div>
+                </div>`).join('');
+        }
+
+        $('#richieste').addEventListener('click', async e => {
+            const ok = e.target.closest('[data-ok]');
+            const no = e.target.closest('[data-no]');
+            if (!ok && !no) return;
+            if (no && !await confirmDialog({ title: 'Rifiutare la richiesta?', message: 'La persona non potrà accedere. Potrà comunque inviare una nuova richiesta.', confirmText: 'Rifiuta', danger: true })) return;
+            const r = await api('POST', `/registrazioni/${(ok || no).dataset.ok || (ok || no).dataset.no}/${ok ? 'accetta' : 'rifiuta'}`);
+            if (!r.ok) return toast(r.error, 'err');
+            toast(ok ? 'Utente creato: può accedere' : 'Richiesta rifiutata');
+            caricaRichieste();
+            if (ok) caricaUtenti();
+        });
+
+        // ----- utenti -----
+        function renderUtenti() {
+            const q = $('#q').value.trim().toLowerCase();
+            const lista = utenti.filter(u => !q || `${u.nome} ${u.cognome} ${u.username}`.toLowerCase().includes(q));
+            $('#conteggio').textContent = `${lista.length} ${lista.length === 1 ? 'account' : 'account'}`;
+            $('#lista').innerHTML = lista.length ? lista.map(u => `
+                <div class="item">
+                    <div class="main">
+                        <div class="title">${esc(u.nome)} ${esc(u.cognome)}</div>
+                        <div class="sub"><span class="mono">@${esc(u.username)}</span>${u.ruolo ? ` · <span class="badge">${esc(u.ruolo)}</span>` : ''}</div>
+                    </div>
+                    <div class="actions">
+                        <button type="button" class="btn-ghost btn-small btn-icon" data-edit="${esc(u.username)}" aria-label="Modifica ${esc(u.username)}"><i class="fa fa-pen"></i></button>
+                        <button type="button" class="btn-danger btn-small btn-icon" data-del="${esc(u.username)}" aria-label="Elimina ${esc(u.username)}"><i class="fa fa-trash"></i></button>
+                    </div>
+                </div>`).join('') : emptyHtml('fa-users', 'Nessun utente corrisponde alla ricerca.');
+        }
+
+        async function caricaUtenti() {
+            $('#lista').innerHTML = loadingHtml();
+            const r = await api('GET', '/getUsers');
+            if (!r.ok) { $('#lista').innerHTML = emptyHtml('fa-triangle-exclamation', r.error); return; }
+            utenti = r.data.users;
+            renderUtenti();
+        }
+
+        $('#q').addEventListener('input', debounce(renderUtenti, 150));
+
+        $('#nuovo').onclick = async () => {
+            const ok = await formModal({
+                title: 'Nuovo utente',
+                submitText: 'Aggiungi',
+                fields: [
+                    { name: 'nome', label: 'Nome', required: true, attrs: { minlength: 3 } },
+                    { name: 'cognome', label: 'Cognome', required: true, attrs: { minlength: 3 } },
+                    { name: 'username', label: 'Username', required: true, attrs: { minlength: 5, maxlength: 30, autocapitalize: 'none' } },
+                    { name: 'password', label: 'Password', type: 'password', required: true, attrs: { minlength: 8 } },
+                ],
+                onSubmit: async v => {
+                    const r = await api('POST', '/addUser', { nome: v.nome.trim(), cognome: v.cognome.trim(), username: v.username.trim(), password: v.password });
+                    if (!r.ok) return r.error;
+                    toast('Utente aggiunto');
+                },
+            });
+            if (ok) caricaUtenti();
+        };
+
+        $('#lista').addEventListener('click', async e => {
+            const ed = e.target.closest('[data-edit]');
+            const del = e.target.closest('[data-del]');
+            if (ed) {
+                const u = utenti.find(x => x.username === ed.dataset.edit);
+                const ok = await formModal({
+                    title: `Modifica @${u.username}`,
+                    fields: [
+                        { name: 'nome', label: 'Nome', required: true, value: u.nome, attrs: { minlength: 3 } },
+                        { name: 'cognome', label: 'Cognome', required: true, value: u.cognome, attrs: { minlength: 3 } },
+                        { name: 'password', label: 'Nuova password', type: 'password', attrs: { minlength: 8 }, hint: 'Lascia vuoto per non cambiarla' },
+                    ],
+                    onSubmit: async v => {
+                        const r = await api('PUT', '/editUser', { nome: v.nome.trim(), cognome: v.cognome.trim(), username: u.username, password: v.password || u.password });
+                        if (!r.ok) return r.error;
+                        toast('Utente aggiornato');
+                    },
+                });
+                if (ok) caricaUtenti();
+            } else if (del) {
+                const u = utenti.find(x => x.username === del.dataset.del);
+                const ok = await confirmDialog({ title: 'Eliminare l\'utente?', message: `@${u.username} (${u.nome} ${u.cognome}) e tutte le sue prenotazioni verranno eliminati. Non si può annullare.`, confirmText: 'Elimina', danger: true });
+                if (!ok) return;
+                const r = await api('DELETE', '/deleteUser', { username: u.username });
+                if (!r.ok) return toast(r.error, 'err');
+                toast('Utente eliminato');
+                if (u.username === user.username) return logout();
+                caricaUtenti();
+            }
+        });
+
+        if (user) { caricaRichieste(); caricaUtenti(); }
+    </script>
+</body>
+
+</html>

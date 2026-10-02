@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="it" data-titolo="Servizi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <script src="brand.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="header"></div>
+    <main class="page">
+        <div class="section-title">
+            <h1 style="margin-bottom:0;text-align:left">Servizi</h1>
+            <button type="button" id="nuovo"><i class="fa fa-plus"></i> Nuovo</button>
+        </div>
+        <p class="muted">Durata, prezzo e nome dei servizi che i clienti possono prenotare.</p>
+        <div id="lista" class="stack"></div>
+    </main>
+    <nav id="nav"></nav>
+
+    <script src="app.js"></script>
+    <script>
+        const user = initPage('admin', 'servizi');
+        let servizi = [];
+
+        const campi = s => [
+            { name: 'nome', label: 'Nome', required: true, value: s ? s.nome : '', attrs: { maxlength: 100 } },
+            { name: 'descrizione', label: 'Descrizione (facoltativa)', type: 'textarea', value: s ? s.descrizione : '' },
+            { name: 'prezzo', label: 'Prezzo (€)', type: 'number', required: true, value: s ? s.prezzo : '', attrs: { min: 0, step: '0.01' } },
+            { name: 'durata', label: 'Durata (minuti)', type: 'number', required: true, value: s ? s.durata : '', attrs: { min: 5, step: 5 }, hint: 'Determina quanti slot occupa in agenda' },
+        ];
+
+        async function salva(id, v) {
+            const body = { nome: v.nome.trim(), descrizione: v.descrizione.trim() || null, prezzo: Number(v.prezzo), durata: Number(v.durata) };
+            const r = id ? await api('PUT', `/servizi/${id}`, body) : await api('POST', '/addServizio', body);
+            if (!r.ok) return r.error;
+            toast(id ? 'Servizio aggiornato' : 'Servizio aggiunto');
+        }
+
+        async function carica() {
+            const box = $('#lista');
+            box.innerHTML = loadingHtml();
+            const r = await api('GET', '/getServizi');
+            if (r.status === 404) { servizi = []; box.innerHTML = emptyHtml('fa-scissors', 'Nessun servizio: aggiungi il primo.'); return; }
+            if (!r.ok) { box.innerHTML = emptyHtml('fa-triangle-exclamation', r.error); return; }
+            servizi = r.data.data;
+            box.innerHTML = servizi.map(s => `
+                <div class="item">
+                    <div class="main">
+                        <div class="title">${esc(s.nome)}</div>
+                        <div class="sub">${esc(s.durata)} min${s.descrizione ? ' · ' + esc(s.descrizione) : ''}</div>
+                    </div>
+                    <div class="price">${esc(fmtEuro(s.prezzo))}</div>
+                    <div class="actions">
+                        <button type="button" class="btn-ghost btn-small btn-icon" data-edit="${s.id}" aria-label="Modifica ${esc(s.nome)}"><i class="fa fa-pen"></i></button>
+                        <button type="button" class="btn-danger btn-small btn-icon" data-del="${s.id}" aria-label="Elimina ${esc(s.nome)}"><i class="fa fa-trash"></i></button>
+                    </div>
+                </div>`).join('');
+        }
+
+        $('#nuovo').onclick = async () => {
+            if (await formModal({ title: 'Nuovo servizio', fields: campi(null), submitText: 'Aggiungi', onSubmit: v => salva(null, v) })) carica();
+        };
+
+        $('#lista').addEventListener('click', async e => {
+            const ed = e.target.closest('[data-edit]');
+            const del = e.target.closest('[data-del]');
+            if (ed) {
+                const s = servizi.find(x => x.id === Number(ed.dataset.edit));
+                if (await formModal({ title: 'Modifica servizio', intro: 'Le prenotazioni già fatte mantengono la durata con cui sono state prese.', fields: campi(s), onSubmit: v => salva(s.id, v) })) carica();
+            } else if (del) {
+                const s = servizi.find(x => x.id === Number(del.dataset.del));
+                if (!await confirmDialog({ title: 'Eliminare il servizio?', message: `"${s.nome}" non sarà più prenotabile.`, confirmText: 'Elimina', danger: true })) return;
+                const r = await api('DELETE', `/servizi/${s.id}`);
+                if (!r.ok) return toast(r.error, 'err');
+                toast('Servizio eliminato');
+                carica();
+            }
+        });
+
+        if (user) carica();
+    </script>
+</body>
+
+</html>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-titolo="Accedi">
 
 <head>
     <meta charset="UTF-8">
@@ -9,49 +9,55 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
     <link rel="stylesheet" href="style.css">
-
 </head>
 
 <body>
-    <header class="hero">
-        <div class="overlay">
-            <img data-brand-logo class="logo" alt="">
-            <p data-brand="completo"></p>
-        </div>
-    </header>
-    <h1 data-brand="benvenuto"></h1>
-    <h1>Effettua qui il tuo accesso</h1>
-    <form id="loginForm">
-        <input type="text" name="username" id="username" placeholder="Username" required>
-        <input type="password" name="password" id="password" placeholder="Password" required>
-        <button type="submit" class="btn">Accedi</button>
-    </form>
-    
-    <p id="errorMessage" style="color: red; display: none;">Credenziali errate</p>
-    
+    <div id="header"></div>
+    <main class="page narrow">
+        <h1 data-brand="benvenuto"></h1>
+        <p class="center muted">Accedi per prenotare o gestire il tuo salone.</p>
+
+        <form id="loginForm" class="card" novalidate>
+            <div class="field">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" autocomplete="username" autocapitalize="none" placeholder="Il tuo username">
+            </div>
+            <div class="field">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" autocomplete="current-password" placeholder="La tua password">
+            </div>
+            <div id="errorMessage" class="form-error" role="alert"></div>
+            <button type="submit" class="block" id="submitBtn">Accedi</button>
+        </form>
+
+        <p class="center" style="margin-top:18px">Non hai un account? <a href="registrati.html">Richiedi la registrazione</a></p>
+
+        <p class="center muted" style="font-size:.78rem; margin-top:22px">
+            <span class="badge">Accesso di prova</span><br>
+            Per ora funziona con qualsiasi credenziale. Uno username che inizia per <span class="mono">admin</span> entra nell'area del salone, gli altri come cliente.
+        </p>
+    </main>
+
+    <script src="app.js"></script>
     <script>
-        document.getElementById('loginForm').addEventListener('submit', async function (event) {
-            event.preventDefault();
-    
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-    
-            const response = await fetch('http://localhost:3000/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-    
-            if (response.ok) {
-                const { user } = await response.json();
-                try { sessionStorage.setItem('user', JSON.stringify(user)); } catch (e) {}
-                // login fittizio: "admin..." va all'area admin, gli altri alla home cliente
-                window.location.href = user.ruolo === 'admin' ? "admin.html" : "home.html";
-            } else {
-                document.getElementById('errorMessage').style.display = "block";
-            }
+        renderHeader(null);
+
+        const existing = session();
+        if (existing) location.replace(existing.ruolo === 'admin' ? 'admin.html' : 'home.html');
+
+        $('#loginForm').addEventListener('submit', async e => {
+            e.preventDefault();
+            const btn = $('#submitBtn');
+            const err = $('#errorMessage');
+            err.textContent = '';
+            btn.disabled = true;
+            const r = await api('POST', '/login', { username: $('#username').value.trim(), password: $('#password').value });
+            btn.disabled = false;
+            if (!r.ok) { err.textContent = r.error; return; }
+            setSession(r.data.user);
+            location.href = r.data.user.ruolo === 'admin' ? 'admin.html' : 'home.html';
         });
     </script>
-    
 </body>
+
 </html>

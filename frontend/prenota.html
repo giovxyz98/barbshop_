@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-titolo="Prenota">
 
 <head>
     <meta charset="UTF-8">
@@ -9,35 +9,263 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
     <link rel="stylesheet" href="style.css">
-    
 </head>
 
 <body>
-    <header class="hero">
-        <div class="overlay">
-            <img data-brand-logo class="logo" alt="">
-            <p data-brand="completo"></p>
+    <div id="header"></div>
+    <main class="page">
+        <h1>Prenota</h1>
+
+        <div id="wizard">
+            <div class="steps" aria-hidden="true"><span id="s1"></span><span id="s2"></span><span id="s3"></span></div>
+
+            <h2>1 · Scegli il servizio</h2>
+            <div id="servizi" class="stack"></div>
+
+            <section id="secGiorno" hidden>
+                <h2>2 · Scegli il giorno</h2>
+                <div class="card">
+                    <div class="monthnav">
+                        <button type="button" class="btn-ghost btn-small btn-icon" id="prev" aria-label="Mese precedente"><i class="fa fa-chevron-left"></i></button>
+                        <span class="label" id="meseLabel"></span>
+                        <button type="button" class="btn-ghost btn-small btn-icon" id="next" aria-label="Mese successivo"><i class="fa fa-chevron-right"></i></button>
+                    </div>
+                    <div id="cal" class="cal"></div>
+                </div>
+            </section>
+
+            <section id="secOrario" hidden>
+                <h2>3 · Scegli l'orario</h2>
+                <div id="slots"></div>
+            </section>
+
+            <section id="secRiepilogo" hidden>
+                <h2>Riepilogo</h2>
+                <div class="card stack">
+                    <div id="riepilogo"></div>
+                    <div id="errore" class="form-error" role="alert"></div>
+                    <button type="button" class="block" id="conferma">Conferma prenotazione</button>
+                    <p class="center muted" style="font-size:.78rem;margin:0">Il pagamento avviene in salone.</p>
+                </div>
+            </section>
         </div>
-    </header>
-	<main>
 
-        <button>Mattino</button>
-        <button>Pomeriggio</button>
-	   </main>
-    <nav class="bottom-nav">
-        <a id="home" onclick="changePage('home')"><i class="fa fa-home"></i><span>Home</span></a>
-        <a id="prenota"  class="active" ><i class="fa fa-calendar"></i><span>Prenota</span></a>
-        <a id="shop" onclick="changePage('shop')"><i class="fa fa-store"></i><span>Shop</span></a>
-        <a id="profilo" onclick="changePage('profilo')"><i class="fa fa-user"></i><span>Profilo</span></a>
-    </nav>
-    
+        <div id="fatto" class="card success" hidden>
+            <i class="fa fa-circle-check"></i>
+            <h2 style="margin-top:0">Prenotazione confermata</h2>
+            <div id="fattoDettaglio" class="muted"></div>
+            <div class="row" style="justify-content:center;margin-top:16px">
+                <a href="home.html" class="btn">Vai alla home</a>
+                <a href="prenota.html" class="btn btn-ghost">Nuova prenotazione</a>
+            </div>
+        </div>
+    </main>
+    <nav id="nav"></nav>
+
+    <script src="app.js"></script>
     <script>
-        function changePage(id) {
-            window.location.href = id + ".html";
-        }
-    </script>
-    
+        const user = initPage('cliente', 'prenota');
+        const st = { servizi: [], servizio: null, data: null, ora: null, finestra: 90, anno: 0, mese: 0 };
 
+        const el = id => document.getElementById(id);
+
+        function aggiornaPassi() {
+            el('s1').classList.toggle('done', !!st.servizio);
+            el('s2').classList.toggle('done', !!st.data);
+            el('s3').classList.toggle('done', !!st.ora);
+        }
+
+        // ----- 1. servizi -----
+        function renderServizi() {
+            el('servizi').innerHTML = st.servizi.map(s => `
+                <div class="item pick ${st.servizio && st.servizio.id === s.id ? 'sel' : ''}" data-id="${s.id}" role="button" tabindex="0">
+                    <div class="main">
+                        <div class="title">${esc(s.nome)}</div>
+                        <div class="sub">${esc(s.durata)} min${s.descrizione ? ' · ' + esc(s.descrizione) : ''}</div>
+                    </div>
+                    <div class="price">${esc(fmtEuro(s.prezzo))}</div>
+                </div>`).join('');
+        }
+
+        async function scegliServizio(id) {
+            st.servizio = st.servizi.find(s => s.id === id) || null;
+            st.ora = null;
+            renderServizi();
+            el('secGiorno').hidden = !st.servizio;
+            if (!st.servizio) return;
+            if (!st.anno) { const t = new Date(); st.anno = t.getFullYear(); st.mese = t.getMonth(); }
+            await renderCalendario();
+            if (st.data) await caricaSlot(); else { el('secOrario').hidden = true; aggiornaRiepilogo(); }
+            aggiornaPassi();
+        }
+
+        // ----- 2. calendario -----
+        async function renderCalendario() {
+            const oggi = todayISO();
+            const ultimo = addDaysISO(oggi, st.finestra);
+            const primoMese = `${st.anno}-${pad(st.mese + 1)}-01`;
+            const giorniMese = new Date(st.anno, st.mese + 1, 0).getDate();
+            const ultimoMese = `${st.anno}-${pad(st.mese + 1)}-${pad(giorniMese)}`;
+
+            el('meseLabel').textContent = `${NOMI_MESE[st.mese]} ${st.anno}`;
+            const t = new Date();
+            el('prev').disabled = st.anno === t.getFullYear() && st.mese === t.getMonth();
+            el('next').disabled = ultimoMese >= ultimo;
+
+            const da = primoMese < oggi ? oggi : primoMese;
+            const a = ultimoMese > ultimo ? ultimo : ultimoMese;
+            const aperti = new Set();
+            if (da <= a) {
+                const r = await api('GET', `/calendario?da=${da}&a=${a}`);
+                if (!r.ok) { el('cal').innerHTML = emptyHtml('fa-triangle-exclamation', r.error); return; }
+                r.data.giorni.filter(g => g.aperto).forEach(g => aperti.add(g.data));
+            }
+
+            const offset = (new Date(st.anno, st.mese, 1).getDay() + 6) % 7; // lunedì = 0
+            let html = ['Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab', 'Dom'].map(d => `<div class="dow">${d}</div>`).join('');
+            html += '<div class="blank"></div>'.repeat(offset);
+            for (let d = 1; d <= giorniMese; d++) {
+                const iso = `${st.anno}-${pad(st.mese + 1)}-${pad(d)}`;
+                const libero = aperti.has(iso);
+                html += `<button type="button" data-d="${iso}" class="${iso === oggi ? 'today' : ''} ${iso === st.data ? 'sel' : ''}" ${libero ? '' : 'disabled'}
+                    aria-label="${esc(fmtDataLunga(iso))}${libero ? '' : ' (non disponibile)'}">${d}</button>`;
+            }
+            el('cal').innerHTML = html;
+        }
+
+        el('prev').onclick = () => { st.mese--; if (st.mese < 0) { st.mese = 11; st.anno--; } renderCalendario(); };
+        el('next').onclick = () => { st.mese++; if (st.mese > 11) { st.mese = 0; st.anno++; } renderCalendario(); };
+
+        el('cal').addEventListener('click', async e => {
+            const b = e.target.closest('button[data-d]');
+            if (!b || b.disabled) return;
+            st.data = b.dataset.d;
+            st.ora = null;
+            $$('#cal button.sel').forEach(x => x.classList.remove('sel'));
+            b.classList.add('sel');
+            await caricaSlot();
+            aggiornaPassi();
+        });
+
+        // ----- 3. orari -----
+        async function caricaSlot() {
+            const sec = el('secOrario');
+            sec.hidden = false;
+            el('slots').innerHTML = loadingHtml();
+            aggiornaRiepilogo();
+            const r = await api('GET', `/disponibilita?data=${st.data}&servizio=${st.servizio.id}`);
+            if (!r.ok) { el('slots').innerHTML = emptyHtml('fa-triangle-exclamation', r.error); return; }
+            const slots = r.data.slots;
+            if (!slots.length) {
+                el('slots').innerHTML = emptyHtml('fa-clock', `Nessun orario libero per ${fmtDataLunga(st.data)}. Prova un altro giorno.`);
+                return;
+            }
+            // Un solo selettore: il pulsante mostra l'orario scelto, il pannello elenca gli orari liberi raggruppati per ora.
+            const perOra = {};
+            slots.forEach(s => (perOra[s.slice(0, 2)] ||= []).push(s));
+            el('slots').innerHTML = `
+                <p class="muted" style="margin-top:0">${esc(fmtDataLunga(st.data))} · ${slots.length} orari liberi</p>
+                <div class="picker">
+                    <button type="button" class="picker-btn" id="pickerBtn" aria-haspopup="listbox" aria-expanded="false">
+                        <span id="pickerValue" class="${st.ora ? '' : 'placeholder'}">${st.ora ? esc(st.ora) : 'Scegli un orario'}</span>
+                        <i class="fa fa-chevron-down"></i>
+                    </button>
+                    <div class="picker-list" id="pickerList" role="listbox" aria-label="Orari disponibili" hidden>
+                        ${Object.entries(perOra).map(([h, list]) => `
+                            <div class="picker-hour">${h}:00</div>
+                            <div class="picker-grid">${list.map(s => `<div class="opt ${s === st.ora ? 'sel' : ''}" role="option" tabindex="0" aria-selected="${s === st.ora}" data-s="${s}">${s}</div>`).join('')}</div>`).join('')}
+                    </div>
+                </div>`;
+        }
+
+        function apriPicker(aperto) {
+            const list = el('pickerList'), btn = el('pickerBtn');
+            if (!list) return;
+            list.hidden = !aperto;
+            btn.setAttribute('aria-expanded', String(aperto));
+            btn.classList.toggle('open', aperto);
+            if (aperto) { const sel = $('.opt.sel', list); if (sel) sel.scrollIntoView({ block: 'center' }); }
+        }
+
+        function scegliOra(s) {
+            st.ora = s;
+            apriPicker(false);
+            el('pickerValue').textContent = s;
+            el('pickerValue').classList.remove('placeholder');
+            $$('#pickerList .opt').forEach(o => { const on = o.dataset.s === s; o.classList.toggle('sel', on); o.setAttribute('aria-selected', String(on)); });
+            aggiornaRiepilogo();
+            aggiornaPassi();
+            el('secRiepilogo').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        el('slots').addEventListener('click', e => {
+            if (e.target.closest('#pickerBtn')) return apriPicker(el('pickerList').hidden);
+            const o = e.target.closest('.opt');
+            if (o) scegliOra(o.dataset.s);
+        });
+        el('slots').addEventListener('keydown', e => {
+            const o = e.target.closest('.opt');
+            if (o && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); scegliOra(o.dataset.s); }
+            if (e.key === 'Escape' && el('pickerList') && !el('pickerList').hidden) { apriPicker(false); el('pickerBtn').focus(); }
+        });
+        document.addEventListener('click', e => { if (el('pickerList') && !e.target.closest('.picker')) apriPicker(false); });
+
+        // ----- riepilogo e conferma -----
+        const fineStimata = () => { const m = toMin(st.ora) + st.servizio.durata; return `${pad(Math.floor(m / 60))}:${pad(m % 60)}`; };
+
+        function aggiornaRiepilogo() {
+            const pronto = st.servizio && st.data && st.ora;
+            el('secRiepilogo').hidden = !pronto;
+            el('errore').textContent = '';
+            if (!pronto) return;
+            el('riepilogo').innerHTML = `
+                <div class="row between"><span class="muted">Servizio</span><strong>${esc(st.servizio.nome)}</strong></div>
+                <div class="row between"><span class="muted">Giorno</span><strong>${esc(fmtDataLunga(st.data))}</strong></div>
+                <div class="row between"><span class="muted">Orario</span><strong class="mono">${esc(st.ora)} – ${esc(fineStimata())}</strong></div>
+                <div class="row between"><span class="muted">Prezzo</span><strong class="price">${esc(fmtEuro(st.servizio.prezzo))}</strong></div>`;
+        }
+
+        el('conferma').onclick = async () => {
+            const btn = el('conferma');
+            btn.disabled = true;
+            const r = await api('POST', '/prenotazioni', { username: user.username, servizio: st.servizio.id, data: st.data, ora: st.ora });
+            btn.disabled = false;
+            if (!r.ok) {
+                toast(r.error, 'err');
+                // slot preso da qualcun altro nel frattempo (o regola violata): si ricarica la lista aggiornata
+                if (r.status === 409 || r.status === 400) { st.ora = null; await caricaSlot(); aggiornaPassi(); }
+                return;
+            }
+            const p = r.data.prenotazione;
+            el('wizard').hidden = true;
+            el('fatto').hidden = false;
+            el('fattoDettaglio').innerHTML = `
+                <p><strong>${esc(p.servizio.nome)}</strong></p>
+                <p>${esc(fmtDataLunga(p.data))}<br><span class="mono">${esc(p.inizio)} – ${esc(p.fine)}</span></p>
+                <p>Ti aspettiamo! Il pagamento avviene in salone.</p>`;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        el('servizi').addEventListener('click', e => { const it = e.target.closest('[data-id]'); if (it) scegliServizio(Number(it.dataset.id)); });
+        el('servizi').addEventListener('keydown', e => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+            const it = e.target.closest('[data-id]');
+            if (it) { e.preventDefault(); scegliServizio(Number(it.dataset.id)); }
+        });
+
+        (async function avvia() {
+            if (!user) return;
+            el('servizi').innerHTML = loadingHtml();
+            const [sv, orari] = await Promise.all([api('GET', '/getServizi'), api('GET', '/orari')]);
+            if (orari.ok) st.finestra = orari.data.impostazioni.finestra_giorni;
+            if (!sv.ok) { el('servizi').innerHTML = emptyHtml('fa-scissors', sv.status === 404 ? 'Nessun servizio disponibile al momento.' : sv.error); return; }
+            st.servizi = sv.data.data;
+            renderServizi();
+            const preset = Number(new URLSearchParams(location.search).get('servizio'));
+            if (preset) scegliServizio(preset);
+            aggiornaPassi();
+        })();
+    </script>
 </body>
 
 </html>

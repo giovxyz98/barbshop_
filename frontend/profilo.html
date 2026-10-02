@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-titolo="Profilo">
 
 <head>
     <meta charset="UTF-8">
@@ -9,32 +9,136 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
     <link rel="stylesheet" href="style.css">
-    
 </head>
 
 <body>
-    <header class="hero">
-        <div class="overlay">
-            <img data-brand-logo class="logo" alt="">
-            <p data-brand="completo"></p>
-        </div>
-    </header>
-	<main>
-	   </main>
-    <nav class="bottom-nav">
-        <a id="home" onclick="changePage('home')"><i class="fa fa-home"></i><span>Home</span></a>
-        <a id="prenota" onclick="changePage('prenota')"><i class="fa fa-calendar"></i><span>Prenota</span></a>
-        <a id="shop" onclick="changePage('shop')"><i class="fa fa-store"></i><span>Shop</span></a>
-        <a id="profilo"  class="active" ><i class="fa fa-user"></i><span>Profilo</span></a>
-    </nav>
-    
-    <script>
-        function changePage(id) {
-            window.location.href = id + ".html";
-        }
-    </script>
-    
+    <div id="header"></div>
+    <main class="page narrow">
+        <h1>Profilo</h1>
 
+        <div class="card" id="info"></div>
+
+        <h2>Impostazioni</h2>
+        <div class="stack" id="menu"></div>
+
+        <div id="storicoBox" hidden>
+            <h2>Storico prenotazioni</h2>
+            <div id="storico" class="stack"></div>
+        </div>
+    </main>
+    <nav id="nav"></nav>
+
+    <script src="app.js"></script>
+    <script>
+        const user = session();   // vale per cliente e admin
+        const isAdmin = user && user.ruolo === 'admin';
+        if (user) { renderHeader(user); renderNav(user, 'profilo'); } else location.replace('index.html');
+
+        let profilo = null;
+
+        async function caricaProfilo() {
+            const r = await api('GET', `/getUser?username=${encodeURIComponent(user.username)}`);
+            if (!r.ok) {
+                $('#info').innerHTML = emptyHtml('fa-triangle-exclamation', r.status === 404 ? 'Account non trovato: esci e accedi di nuovo.' : r.error);
+                return;
+            }
+            profilo = r.data.user;
+            $('#info').innerHTML = `
+                <div class="row between"><span class="muted">Nome</span><strong>${esc(profilo.nome)}</strong></div>
+                <div class="row between"><span class="muted">Cognome</span><strong>${esc(profilo.cognome)}</strong></div>
+                <div class="row between"><span class="muted">Username</span><strong class="mono">${esc(profilo.username)}</strong></div>
+                <div class="row between"><span class="muted">Tipo account</span><span class="badge">${isAdmin ? 'Salone' : 'Cliente'}</span></div>`;
+        }
+
+        function voci() {
+            const v = [
+                { id: 'password', icon: 'fa-key', label: 'Cambia password' },
+                { id: 'faq', icon: 'fa-circle-question', label: 'Domande frequenti' },
+            ];
+            if (!isAdmin) v.splice(1, 0, { id: 'storico', icon: 'fa-clock-rotate-left', label: 'Storico prenotazioni' });
+            v.push({ id: 'logout', icon: 'fa-right-from-bracket', label: 'Esci' });
+            v.push({ id: 'elimina', icon: 'fa-trash', label: 'Elimina account', danger: true });
+            return v;
+        }
+
+        $('#menu').innerHTML = voci().map(v => `
+            <button type="button" class="item ${v.danger ? 'btn-danger' : 'btn-ghost'}" data-v="${v.id}" style="width:100%;text-align:left;text-transform:none;letter-spacing:.04em;font-size:.9rem">
+                <i class="fa ${v.icon}" style="width:20px"></i><span class="main">${esc(v.label)}</span><i class="fa fa-chevron-right" style="opacity:.5"></i>
+            </button>`).join('');
+
+        // ----- azioni -----
+        async function cambiaPassword() {
+            await formModal({
+                title: 'Cambia password',
+                submitText: 'Aggiorna',
+                fields: [
+                    { name: 'vecchia', label: 'Vecchia password', type: 'password', required: true },
+                    { name: 'nuova', label: 'Nuova password', type: 'password', required: true, attrs: { minlength: 8 }, hint: 'Almeno 8 caratteri' },
+                    { name: 'conferma', label: 'Conferma nuova password', type: 'password', required: true },
+                ],
+                onSubmit: async v => {
+                    // TODO auth reale: la verifica della vecchia password andrà fatta dal server
+                    if (!profilo || v.vecchia !== profilo.password) return 'La vecchia password non è corretta';
+                    if (v.nuova !== v.conferma) return 'Le due password non coincidono';
+                    if (v.nuova === v.vecchia) return 'La nuova password deve essere diversa dalla vecchia';
+                    const r = await api('PUT', '/editPassword', { username: user.username, newPassword: v.nuova });
+                    if (!r.ok) return r.error;
+                    profilo.password = v.nuova;
+                    toast('Password aggiornata');
+                },
+            });
+        }
+
+        async function caricaStorico() {
+            const box = $('#storico');
+            $('#storicoBox').hidden = false;
+            box.innerHTML = loadingHtml();
+            const r = await api('GET', `/prenotazioni?username=${encodeURIComponent(user.username)}`);
+            if (!r.ok) { box.innerHTML = emptyHtml('fa-triangle-exclamation', r.error); return; }
+            const oggi = todayISO(), adesso = nowMin();
+            const passate = r.data.prenotazioni
+                .filter(p => p.stato === 'annullata' || p.data < oggi || (p.data === oggi && toMin(p.fine) <= adesso))
+                .sort((a, b) => (b.data + b.inizio).localeCompare(a.data + a.inizio));
+            box.innerHTML = passate.length ? passate.map(p => `
+                <div class="item ${p.stato === 'annullata' ? 'off' : ''}">
+                    <div class="when">${esc(fmtDataBreve(p.data))}<br>${esc(p.inizio)}</div>
+                    <div class="main"><div class="title">${esc(p.servizio.nome)}</div>
+                    <div class="sub price">${esc(fmtEuro(p.servizio.prezzo))}</div></div>
+                    ${p.stato === 'annullata' ? '<span class="badge off">Annullata</span>' : '<span class="badge ok">Completata</span>'}
+                </div>`).join('') : emptyHtml('fa-clock-rotate-left', 'Ancora nessuna prenotazione passata.');
+            $('#storicoBox').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        async function esci() {
+            if (await confirmDialog({ title: 'Uscire?', message: 'Sei sicuro di voler uscire?', confirmText: 'Esci' })) logout();
+        }
+
+        async function eliminaAccount() {
+            const ok = await confirmDialog({
+                title: 'Eliminare l\'account?',
+                message: 'Verranno eliminati anche i tuoi dati e le tue prenotazioni. L\'operazione non si può annullare.',
+                confirmText: 'Sì, elimina', cancelText: 'No', danger: true,
+            });
+            if (!ok) return;
+            const r = await api('DELETE', '/deleteUser', { username: user.username });
+            if (!r.ok) return toast(r.error, 'err');
+            logout();
+        }
+
+        $('#menu').addEventListener('click', e => {
+            const b = e.target.closest('[data-v]');
+            if (!b) return;
+            ({
+                password: cambiaPassword,
+                storico: caricaStorico,
+                faq: () => { location.href = 'faq.html'; },
+                logout: esci,
+                elimina: eliminaAccount,
+            })[b.dataset.v]();
+        });
+
+        if (user) caricaProfilo();
+    </script>
 </body>
 
 </html>

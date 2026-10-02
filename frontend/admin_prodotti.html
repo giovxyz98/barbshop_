@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="it" data-titolo="Prodotti">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <script src="brand.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="header"></div>
+    <main class="page">
+        <div class="section-title">
+            <h1 style="margin-bottom:0;text-align:left">Prodotti</h1>
+            <button type="button" id="nuovo"><i class="fa fa-plus"></i> Nuovo</button>
+        </div>
+        <p class="muted">Il catalogo che i clienti consultano. Non si vende online: i prodotti si pagano in salone.</p>
+        <div id="lista" class="stack"></div>
+    </main>
+    <nav id="nav"></nav>
+
+    <script src="app.js"></script>
+    <script>
+        const user = initPage('admin', 'prodotti');
+        const CATEGORIE = ['Attrezzi', 'Prodotti per capelli', 'Profumi', 'Barba', 'Altro'];
+        let prodotti = [];
+
+        const campi = p => [
+            { name: 'nome', label: 'Nome', required: true, value: p ? p.nome : '', attrs: { maxlength: 100 } },
+            { name: 'categoria', label: 'Categoria', required: true, value: p ? p.categoria : CATEGORIE[1], list: { id: 'cat', values: [...new Set([...CATEGORIE, ...prodotti.map(x => x.categoria)])] } },
+            { name: 'descrizione', label: 'Descrizione (facoltativa)', type: 'textarea', value: p ? p.descrizione : '' },
+            { name: 'prezzo', label: 'Prezzo (€)', type: 'number', required: true, value: p ? p.prezzo : '', attrs: { min: 0, step: '0.01' } },
+            { name: 'immagine', label: 'Immagine (indirizzo web, facoltativa)', type: 'url', value: p ? p.immagine : '', attrs: { placeholder: 'https://…' } },
+            { name: 'disponibile', label: 'Visibile ai clienti', type: 'checkbox', value: p ? !!p.disponibile : true },
+        ];
+
+        async function salva(id, v) {
+            const body = { nome: v.nome.trim(), categoria: v.categoria.trim(), descrizione: v.descrizione.trim(), prezzo: Number(v.prezzo), immagine: v.immagine.trim(), disponibile: v.disponibile };
+            const r = id ? await api('PUT', `/prodotti/${id}`, body) : await api('POST', '/prodotti', body);
+            if (!r.ok) return r.error;
+            toast(id ? 'Prodotto aggiornato' : 'Prodotto aggiunto');
+        }
+
+        async function carica() {
+            const box = $('#lista');
+            box.innerHTML = loadingHtml();
+            const r = await api('GET', '/prodotti?tutti=1');
+            if (!r.ok) { box.innerHTML = emptyHtml('fa-triangle-exclamation', r.error); return; }
+            prodotti = r.data.prodotti;
+            if (!prodotti.length) { box.innerHTML = emptyHtml('fa-bag-shopping', 'Il catalogo è vuoto: aggiungi il primo prodotto.'); return; }
+            box.innerHTML = prodotti.map(p => `
+                <div class="item ${p.disponibile ? '' : 'off'}">
+                    <div class="main">
+                        <div class="title">${esc(p.nome)} ${p.disponibile ? '' : '<span class="badge off">Nascosto</span>'}</div>
+                        <div class="sub">${esc(p.categoria)}${p.descrizione ? ' · ' + esc(p.descrizione) : ''}</div>
+                    </div>
+                    <div class="price">${esc(fmtEuro(p.prezzo))}</div>
+                    <div class="actions">
+                        <button type="button" class="btn-ghost btn-small btn-icon" data-edit="${p.id}" aria-label="Modifica ${esc(p.nome)}"><i class="fa fa-pen"></i></button>
+                        <button type="button" class="btn-danger btn-small btn-icon" data-del="${p.id}" aria-label="Elimina ${esc(p.nome)}"><i class="fa fa-trash"></i></button>
+                    </div>
+                </div>`).join('');
+        }
+
+        $('#nuovo').onclick = async () => {
+            if (await formModal({ title: 'Nuovo prodotto', fields: campi(null), submitText: 'Aggiungi', onSubmit: v => salva(null, v) })) carica();
+        };
+
+        $('#lista').addEventListener('click', async e => {
+            const ed = e.target.closest('[data-edit]');
+            const del = e.target.closest('[data-del]');
+            if (ed) {
+                const p = prodotti.find(x => x.id === Number(ed.dataset.edit));
+                if (await formModal({ title: 'Modifica prodotto', fields: campi(p), onSubmit: v => salva(p.id, v) })) carica();
+            } else if (del) {
+                const p = prodotti.find(x => x.id === Number(del.dataset.del));
+                if (!await confirmDialog({ title: 'Eliminare il prodotto?', message: `"${p.nome}" sparirà dal catalogo. In alternativa puoi nasconderlo.`, confirmText: 'Elimina', danger: true })) return;
+                const r = await api('DELETE', `/prodotti/${p.id}`);
+                if (!r.ok) return toast(r.error, 'err');
+                toast('Prodotto eliminato');
+                carica();
+            }
+        });
+
+        if (user) carica();
+    </script>
+</body>
+
+</html>

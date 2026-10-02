@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="it" data-titolo="Registrazione">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <script src="brand.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="header"></div>
+    <main class="page narrow">
+        <h1>Richiedi la registrazione</h1>
+
+        <div id="formBox">
+            <p class="center muted">Il salone riceverà la tua richiesta e potrai accedere dopo che l'avrà approvata.</p>
+            <form id="regForm" class="card" novalidate>
+                <div class="field">
+                    <label for="nome">Nome</label>
+                    <input id="nome" name="nome" type="text" minlength="3" autocomplete="given-name" required>
+                </div>
+                <div class="field">
+                    <label for="cognome">Cognome</label>
+                    <input id="cognome" name="cognome" type="text" minlength="3" autocomplete="family-name" required>
+                </div>
+                <div class="field">
+                    <label for="username">Username</label>
+                    <input id="username" name="username" type="text" minlength="5" maxlength="30" pattern="[A-Za-z0-9._-]+" autocapitalize="none" autocomplete="username" required>
+                    <span class="muted" style="font-size:.75rem">Da 5 a 30 caratteri: lettere, numeri, punto, trattino, underscore.</span>
+                </div>
+                <div class="field">
+                    <label for="password">Password</label>
+                    <input id="password" name="password" type="password" minlength="8" autocomplete="new-password" required>
+                    <span class="muted" style="font-size:.75rem">Almeno 8 caratteri.</span>
+                </div>
+                <div class="field">
+                    <label for="password2">Conferma password</label>
+                    <input id="password2" name="password2" type="password" autocomplete="new-password" required>
+                </div>
+                <div id="errorMessage" class="form-error" role="alert"></div>
+                <button type="submit" class="block" id="submitBtn">Invia richiesta</button>
+            </form>
+        </div>
+
+        <div id="doneBox" class="card success" hidden>
+            <i class="fa fa-circle-check"></i>
+            <h2 style="margin-top:0">Richiesta inviata</h2>
+            <p class="muted">Il salone la esaminerà a breve. Quando sarà approvata potrai accedere con il tuo username.</p>
+        </div>
+
+        <p class="center" style="margin-top:18px"><a href="index.html">← Torna all'accesso</a></p>
+    </main>
+
+    <script src="app.js"></script>
+    <script>
+        renderHeader(null);
+
+        $('#regForm').addEventListener('submit', async e => {
+            e.preventDefault();
+            const form = e.target;
+            const err = $('#errorMessage');
+            err.textContent = '';
+            if (!form.checkValidity()) { form.reportValidity(); return; }
+            if (form.password.value !== form.password2.value) { err.textContent = 'Le due password non coincidono'; return; }
+
+            const btn = $('#submitBtn');
+            btn.disabled = true;
+            const r = await api('POST', '/registrazioni', {
+                nome: form.nome.value, cognome: form.cognome.value,
+                username: form.username.value.trim(), password: form.password.value,
+            });
+            btn.disabled = false;
+            if (!r.ok) { err.textContent = r.error; return; }
+            $('#formBox').hidden = true;
+            $('#doneBox').hidden = false;
+        });
+    </script>
+</body>
+
+</html>

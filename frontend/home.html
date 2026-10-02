@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-titolo="Home">
 
 <head>
     <meta charset="UTF-8">
@@ -9,124 +9,105 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
     <link rel="stylesheet" href="style.css">
-
 </head>
 
 <body>
-    <header class="hero">
-        <div class="overlay">
-            <img data-brand-logo class="logo" alt="">
-            <p data-brand="completo"></p>
-        </div>
-    </header>
-    <main>
-        <div class="booking">
-            <p>Prenota qui il tuo servizio</p>
-            <button onclick="changePage('prenota')" class="btn">Prenota</button>
-        </div>
-        <h2>Orari del salone</h2>
-        <div class="hours">
-            <div id="giorni" class="schedule">
-                <div class="day open">
-                    <p>Martedì</p>
-                    <small>05/03/2024</small>
-                    <div class="orari">
-                        <div class="mattino">
-                            <span>Mattino:</span>
-                            09:00 - 13:00
-                        </div>
-                        <div class="pomeriggio">
-                            <span>Pomeriggio:</span>
-                            15:00 - 20:00
-                        </div>
-                    </div>
-                </div>
-                <div class="day closed">
-                    <p>Lunedì</p>
-                    <small>04/03/2024</small>
-                    <div class="orari">
-                        Chiuso
-                    </div>
-                </div>
+    <div id="header"></div>
+    <main class="page">
+        <h1 id="saluto"></h1>
 
+        <div class="section-title">
+            <h2>Le tue prenotazioni</h2>
+            <a href="prenota.html" class="btn btn-small">Prenota</a>
+        </div>
+        <div id="prenotazioni" class="stack"></div>
 
-            </div>
-        </div>
-        </div>
         <h2>Servizi</h2>
-        <div class="services">
-            <div class="service">
-                <p>Taglio</p>
-                <span>€ 10,00</span>
-            </div>
-            <div class="service">
-                <p>Barba</p>
-                <span>€ 5,00</span>
-            </div>
-            <div class="service">
-                <p>Sopracciglia</p>
-                <span>€ 3,00</span>
-            </div>
-            <div class="service">
-                <p>Completo</p>
-                <span>€ 18,00</span>
-            </div>
+        <div id="servizi" class="quick"></div>
 
-
+        <h2>Orari del salone</h2>
+        <div id="giorni" class="hours"></div>
     </main>
+    <nav id="nav"></nav>
 
-    <nav class="bottom-nav">
-        <a id="home" class="active"><i class="fa fa-home"></i><span>Home</span></a>
-        <a id="prenota" onclick="changePage('prenota')"><i class="fa fa-calendar"></i><span>Prenota</span></a>
-        <a id="shop" onclick="changePage('shop')"><i class="fa fa-store"></i><span>Shop</span></a>
-        <a id="profilo" onclick="changePage('profilo')"><i class="fa fa-user"></i><span>Profilo</span></a>
-    </nav>
-
+    <script src="app.js"></script>
     <script>
-        const API = 'http://localhost:3000/api';
-        const NOMI_GIORNO = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
+        const user = initPage('cliente', 'home');
 
-        function changePage(id) {
-            window.location.href = id + ".html";
+        function caricaSaluto() {
+            $('#saluto').textContent = `Ciao ${user.nome || user.username}`;
         }
 
-        function isoLocale(d) {
-            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-        }
-
-        // Orari dei prossimi 7 giorni dal calendario del salone: una riga per fascia, "Chiuso" se non si lavora.
-        async function fetchGiorni() {
-            try {
-                const da = new Date();
-                const a = new Date();
-                a.setDate(a.getDate() + 6);
-                const response = await fetch(`${API}/calendario?da=${isoLocale(da)}&a=${isoLocale(a)}`);
-                const { giorni } = await response.json();
-
-                const container = document.getElementById('giorni');
-                container.innerHTML = '';
-                giorni.forEach(giorno => {
-                    const [y, m, d] = giorno.data.split('-');
-                    const div = document.createElement('div');
-                    div.classList.add('day', giorno.aperto ? 'open' : 'closed');
-                    const orari = giorno.aperto
-                        ? giorno.fasce.map(f => `<span>${f.apertura} - ${f.chiusura}</span>`).join('')
-                        : 'Chiuso';
-                    div.innerHTML = `
-                        <p>${NOMI_GIORNO[giorno.giorno_settimana]}</p>
-                        <small>${d}/${m}/${y}</small>
-                        <div class="orari">${orari}</div>`;
-                    container.appendChild(div);
-                });
-            } catch (error) {
-                console.error("Errore nel recupero degli orari:", error);
+        // Prenotazioni confermate che non sono ancora finite.
+        async function caricaPrenotazioni() {
+            const box = $('#prenotazioni');
+            box.innerHTML = loadingHtml();
+            const r = await api('GET', `/prenotazioni?username=${encodeURIComponent(user.username)}&da=${todayISO()}&stato=confermata`);
+            if (!r.ok) { box.innerHTML = emptyHtml('fa-triangle-exclamation', r.error); return; }
+            const oggi = todayISO(), adesso = nowMin();
+            const attive = r.data.prenotazioni.filter(p => p.data > oggi || toMin(p.fine) > adesso);
+            if (!attive.length) {
+                box.innerHTML = emptyHtml('fa-calendar', 'Non hai prenotazioni attive. Prenota il tuo prossimo appuntamento!');
+                return;
             }
+            box.innerHTML = attive.map(p => `
+                <div class="item">
+                    <div class="when">${esc(fmtDataBreve(p.data))}<br>${esc(p.inizio)}</div>
+                    <div class="main">
+                        <div class="title">${esc(p.servizio.nome)}</div>
+                        <div class="sub">${esc(p.inizio)} – ${esc(p.fine)} · <span class="price">${esc(fmtEuro(p.servizio.prezzo))}</span></div>
+                    </div>
+                    <div class="actions"><button class="btn-danger btn-small" data-annulla="${p.id}">Annulla</button></div>
+                </div>`).join('');
         }
 
-        fetchGiorni();
+        $('#prenotazioni').addEventListener('click', async e => {
+            const b = e.target.closest('[data-annulla]');
+            if (!b) return;
+            const ok = await confirmDialog({ title: 'Annullare la prenotazione?', message: 'Lo slot tornerà disponibile per altri clienti.', confirmText: 'Sì, annulla', cancelText: 'Mantieni', danger: true });
+            if (!ok) return;
+            const r = await api('DELETE', `/prenotazioni/${b.dataset.annulla}`);
+            if (!r.ok) return toast(r.error, 'err');
+            toast('Prenotazione annullata');
+            caricaPrenotazioni();
+        });
+
+        async function caricaServizi() {
+            const box = $('#servizi');
+            const r = await api('GET', '/getServizi');
+            if (!r.ok) { box.innerHTML = emptyHtml('fa-scissors', r.status === 404 ? 'Nessun servizio disponibile' : r.error); return; }
+            box.innerHTML = r.data.data.map(s => `
+                <a class="card hover" href="prenota.html?servizio=${s.id}">
+                    <div class="n">${esc(s.nome)}</div>
+                    <div class="price">${esc(fmtEuro(s.prezzo))}</div>
+                    <div class="d">${esc(s.durata)} min</div>
+                </a>`).join('');
+        }
+
+        // Orari dei prossimi 7 giorni dal calendario del salone.
+        async function caricaOrari() {
+            const box = $('#giorni');
+            const da = todayISO();
+            const r = await api('GET', `/calendario?da=${da}&a=${addDaysISO(da, 6)}`);
+            if (!r.ok) { box.innerHTML = emptyHtml('fa-clock', r.error); return; }
+            box.innerHTML = r.data.giorni.map(g => {
+                const [y, m, d] = g.data.split('-');
+                const orari = g.aperto ? g.fasce.map(f => `<span>${esc(f.apertura)} – ${esc(f.chiusura)}</span>`).join('') : 'Chiuso';
+                return `<div class="day ${g.aperto ? 'open' : 'closed'} ${g.data === da ? 'today' : ''}">
+                    <p>${esc(NOMI_GIORNO[g.giorno_settimana])}</p>
+                    <small>${d}/${m}</small>
+                    <div class="orari">${orari}</div>
+                </div>`;
+            }).join('');
+        }
+
+        if (user) {
+            caricaSaluto();
+            caricaPrenotazioni();
+            caricaServizi();
+            caricaOrari();
+        }
     </script>
-
-
 </body>
 
 </html>

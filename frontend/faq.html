@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="it" data-titolo="FAQ">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <script src="brand.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div id="header"></div>
+    <main class="page narrow">
+        <h1>Domande frequenti</h1>
+        <div id="lista" class="stack"></div>
+        <p class="center" style="margin-top:18px"><a href="profilo.html">← Torna al profilo</a></p>
+    </main>
+    <nav id="nav"></nav>
+
+    <script src="app.js"></script>
+    <script>
+        const user = initPage(null, 'profilo');
+
+        const FAQ_CLIENTE = [
+            ['Come prenoto un appuntamento?', 'Vai su "Prenota", scegli il servizio, il giorno e uno degli orari liberi, poi conferma. Riceverai subito il riepilogo.'],
+            ['Posso prenotare più di un appuntamento nello stesso giorno?', 'No, è consentita una sola prenotazione al giorno per cliente. Puoi prenotare altri giorni.'],
+            ['Come annullo una prenotazione?', 'Dalla home, nell\'elenco delle tue prenotazioni attive, tocca "Annulla". Lo slot tornerà subito disponibile.'],
+            ['Quanto in anticipo posso prenotare?', 'Fino a un numero di giorni stabilito dal salone. I giorni non prenotabili nel calendario appaiono disattivati.'],
+            ['Perché non vedo orari liberi in un giorno?', 'Il salone potrebbe essere chiuso, oppure tutti gli orari adatti alla durata del servizio sono già occupati. Prova un altro giorno o un servizio più breve.'],
+            ['Posso pagare dall\'app?', 'No. Al momento non sono previsti pagamenti in app: paghi in salone, sia i servizi sia gli eventuali prodotti.'],
+            ['Posso comprare i prodotti online?', 'No, il catalogo serve solo a consultare prodotti e prezzi. Per ritirarli rivolgiti al salone.'],
+            ['Come cambio la password?', 'Dal profilo, tocca "Cambia password" e inserisci la vecchia e la nuova password.'],
+            ['Come ottengo un account?', 'Dalla pagina di accesso scegli "Richiedi la registrazione". Il salone esamina la richiesta e, se la approva, potrai accedere.'],
+            ['Come elimino il mio account?', 'Dal profilo, tocca "Elimina account" e conferma. Verranno eliminati anche i tuoi dati e le tue prenotazioni.'],
+        ];
+
+        const FAQ_SALONE = [
+            ['Come imposto gli orari di apertura?', 'In "Orari" definisci le fasce di ogni giorno (ad esempio mattina e pomeriggio). Un giorno senza fasce risulta chiuso.'],
+            ['Come chiudo il salone per ferie o una festività?', 'In "Orari", nelle eccezioni, aggiungi la data e scegli "Chiuso". Puoi anche definire un orario speciale solo per quel giorno.'],
+            ['Cosa succede alle prenotazioni se chiudo un giorno?', 'Quelle già confermate restano: vanno annullate manualmente dall\'agenda. Le eccezioni valgono per le nuove prenotazioni.'],
+            ['Come vedo le prenotazioni di un giorno?', 'In "Agenda" scegli la data. Puoi cercare per nome o cognome e consultare lo storico delle prenotazioni passate.'],
+            ['Come aggiungo o modifico un servizio?', 'In "Servizi" puoi creare, modificare ed eliminare i servizi con nome, prezzo e durata. Un servizio già prenotato non si può eliminare.'],
+            ['La durata di un servizio cambia le prenotazioni esistenti?', 'No: ogni prenotazione conserva la durata con cui è stata fatta. La nuova durata vale per le prenotazioni successive.'],
+            ['Come gestisco il catalogo prodotti?', 'In "Prodotti" aggiungi nome, categoria, prezzo, descrizione e immagine. Puoi nascondere un prodotto senza eliminarlo.'],
+            ['Come accetto un nuovo cliente?', 'I clienti inviano una richiesta di registrazione. In "Utenti" trovi le richieste in attesa e le accetti o le rifiuti.'],
+            ['Posso cambiare ogni quanto si offrono gli orari?', 'Sì, in "Orari" → impostazioni: passo degli slot, preavviso minimo e quanti giorni in anticipo si può prenotare.'],
+            ['Come inserisco o annullo una prenotazione per un cliente?', 'In "Agenda" tocca "Prenotazione", scegli cliente, servizio, giorno e orario. Per annullare tocca "Annulla" accanto a qualsiasi prenotazione: vale sia per quelle inserite da te sia per quelle fatte dai clienti.'],
+        ];
+
+        if (user) {
+            const faq = user.ruolo === 'admin' ? FAQ_SALONE : FAQ_CLIENTE;
+            $('#lista').innerHTML = faq.map(([q, a]) => `<details class="faq"><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('');
+        }
+    </script>
+</body>
+
+</html>

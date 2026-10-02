@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-titolo="Prodotti">
 
 <head>
     <meta charset="UTF-8">
@@ -9,32 +9,68 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
     <link rel="stylesheet" href="style.css">
-    
 </head>
 
 <body>
-    <header class="hero">
-        <div class="overlay">
-            <img data-brand-logo class="logo" alt="">
-            <p data-brand="completo"></p>
-        </div>
-    </header>
-	<main>
-	   </main>
-    <nav class="bottom-nav">
-        <a id="home"onclick="changePage('home')"><i class="fa fa-home"></i><span>Home</span></a>
-        <a id="prenota" onclick="changePage('prenota')"><i class="fa fa-calendar"></i><span>Prenota</span></a>
-        <a id="shop" class="active" ><i class="fa fa-store"></i><span>Shop</span></a>
-        <a id="profilo" onclick="changePage('profilo')"><i class="fa fa-user"></i><span>Profilo</span></a>
-    </nav>
-    
-    <script>
-        function changePage(id) {
-            window.location.href = id + ".html";
-        }
-    </script>
-    
+    <div id="header"></div>
+    <main class="page">
+        <h1>Prodotti</h1>
+        <p class="center muted">I prezzi sono indicativi. Non si acquista online: ritira e paga direttamente in salone.</p>
 
+        <div id="filtri" class="chips"></div>
+        <div id="catalogo" class="grid"></div>
+    </main>
+    <nav id="nav"></nav>
+
+    <script src="app.js"></script>
+    <script>
+        const user = initPage('cliente', 'shop');
+        let prodotti = [];
+        let categoria = 'Tutti';
+
+        function render() {
+            const categorie = ['Tutti', ...new Set(prodotti.map(p => p.categoria))];
+            $('#filtri').innerHTML = categorie.map(c => `<button type="button" class="chip ${c === categoria ? 'active' : ''}" data-c="${esc(c)}">${esc(c)}</button>`).join('');
+
+            const lista = prodotti.filter(p => categoria === 'Tutti' || p.categoria === categoria);
+            if (!lista.length) { $('#catalogo').innerHTML = ''; $('#catalogo').insertAdjacentHTML('beforeend', emptyHtml('fa-bag-shopping', 'Nessun prodotto in questa categoria.')); return; }
+            $('#catalogo').innerHTML = lista.map(p => `
+                <div class="card product hover">
+                    <div class="thumb" ${p.immagine ? `data-img="${esc(p.immagine)}"` : ''}>${p.immagine ? '' : '<i class="fa fa-bottle-droplet"></i>'}</div>
+                    <div class="body">
+                        <div class="name">${esc(p.nome)}</div>
+                        ${p.descrizione ? `<div class="desc">${esc(p.descrizione)}</div>` : '<div class="desc"></div>'}
+                        <div class="price">${esc(fmtEuro(p.prezzo))}</div>
+                    </div>
+                </div>`).join('');
+
+            // l'immagine si imposta via JS (niente URL non fidati dentro l'HTML) e, se non carica, resta l'icona
+            $$('#catalogo .thumb[data-img]').forEach(t => {
+                const img = new Image();
+                img.onload = () => { t.innerHTML = ''; t.style.backgroundImage = `url("${img.src.replace(/"/g, '%22')}")`; };
+                img.onerror = () => { t.innerHTML = '<i class="fa fa-bottle-droplet"></i>'; };
+                t.innerHTML = '<i class="fa fa-bottle-droplet"></i>';
+                img.src = t.dataset.img;
+            });
+        }
+
+        $('#filtri').addEventListener('click', e => {
+            const b = e.target.closest('[data-c]');
+            if (!b) return;
+            categoria = b.dataset.c;
+            render();
+        });
+
+        (async function avvia() {
+            if (!user) return;
+            $('#catalogo').innerHTML = loadingHtml();
+            const r = await api('GET', '/prodotti');
+            if (!r.ok) { $('#catalogo').innerHTML = emptyHtml('fa-triangle-exclamation', r.error); return; }
+            prodotti = r.data.prodotti;
+            if (!prodotti.length) { $('#catalogo').innerHTML = emptyHtml('fa-bag-shopping', 'Il catalogo è ancora vuoto.'); return; }
+            render();
+        })();
+    </script>
 </body>
 
 </html>

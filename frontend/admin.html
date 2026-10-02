@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="it" data-titolo="Agenda">
 
 <head>
     <meta charset="UTF-8">
@@ -9,42 +9,218 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
     <link rel="stylesheet" href="style.css">
-
 </head>
 
 <body>
-    <header class="hero">
-        <div class="overlay">
-            <img data-brand-logo class="logo" alt="">
-            <p data-brand="completo"></p>
+    <div id="header"></div>
+    <main class="page">
+        <div class="section-title">
+            <h1 style="margin-bottom:0;text-align:left">Agenda</h1>
+            <button type="button" id="nuova"><i class="fa fa-plus"></i> Prenotazione</button>
         </div>
-    </header>
-    <main class="admin">
-        <div class="admin-section">
-            <p>Sezione utenti</p>
-            <button onclick="goToService('addUser')">Aggiungi Utente</button>
-            <button onclick="goToService('editUser')">Modifica Utente</button>
-            <button onclick="goToService('deleteUser')">Elimina Utente</button>
-            <button onclick="goToService('viewUsers')">Visualizza Utenti</button>
+
+        <a id="richieste" class="item" href="admin_utenti.html" hidden style="text-decoration:none;color:inherit;margin-bottom:14px">
+            <i class="fa fa-user-clock" style="color:var(--gold)"></i>
+            <div class="main"><div class="title" id="richiesteTesto"></div><div class="sub">Tocca per esaminarle</div></div>
+            <i class="fa fa-chevron-right muted"></i>
+        </a>
+
+        <div class="chips" role="tablist">
+            <button type="button" class="chip active" data-tab="attive" role="tab">Attive</button>
+            <button type="button" class="chip" data-tab="storico" role="tab">Storico</button>
         </div>
-        <div class="admin-section">
-            <p>Sezione servizi</p>
-            <button onclick="goToService('addService')">Aggiungi Servizio</button>
-            <button onclick="goToService('editService')">Modifica Servizio</button>
-            <button onclick="goToService('deleteService')">Elimina Servizio</button>
-            <button onclick="goToService('viewServices')">Visualizza Servizi</button>
+
+        <div id="barAttive" class="toolbar">
+            <div class="datenav">
+                <button type="button" class="btn-ghost btn-small btn-icon" id="giornoPrev" aria-label="Giorno precedente"><i class="fa fa-chevron-left"></i></button>
+                <input type="date" id="giorno" aria-label="Data" style="width:auto">
+                <button type="button" class="btn-ghost btn-small btn-icon" id="giornoNext" aria-label="Giorno successivo"><i class="fa fa-chevron-right"></i></button>
+                <button type="button" class="btn-ghost btn-small" id="oggi">Oggi</button>
+            </div>
         </div>
-        <div class="admin-section">
-            <p>Sezione prenotazioni</p>
-            <button onclick="goToService('addReservation')">Aggiungi Prenotazione</button>
-            <button onclick="goToService('editReservation')">Modifica Prenotazione</button>
-            <button onclick="goToService('deleteReservation')">Elimina Prenotazione</button>
-            <button onclick="goToService('viewReservations')">Visualizza Prenotazioni</button>
+        <div id="barStorico" class="toolbar" hidden>
+            <div class="field" style="margin:0"><label for="da">Dal</label><input type="date" id="da"></div>
+            <div class="field" style="margin:0"><label for="a">Al</label><input type="date" id="a"></div>
         </div>
+        <div class="toolbar">
+            <input type="search" id="q" placeholder="Cerca per nome o cognome" aria-label="Cerca per nome o cognome">
+        </div>
+
+        <p id="stato" class="muted center" style="margin:0 0 10px"></p>
+        <div id="lista" class="stack"></div>
     </main>
+    <nav id="nav"></nav>
+
+    <script src="app.js"></script>
     <script>
-        function goToService(service) {
-            window.location.href = `administration.html?service=${encodeURIComponent(service)}`;
+        const user = initPage('admin', 'agenda');
+        const st = { tab: 'attive', giorno: todayISO(), da: addDaysISO(todayISO(), -30), a: todayISO() };
+
+        function riga(p, conGiorno) {
+            const finita = p.stato === 'confermata' && (p.data < todayISO() || (p.data === todayISO() && toMin(p.fine) <= nowMin()));
+            return `
+            <div class="item ${p.stato === 'annullata' ? 'off' : ''}" style="${finita ? 'opacity:.7' : ''}">
+                <div class="when">${conGiorno ? esc(fmtDataBreve(p.data)) + '<br>' : ''}${esc(p.inizio)} – ${esc(p.fine)}</div>
+                <div class="main">
+                    <div class="title">${esc(p.nome)} ${esc(p.cognome)}</div>
+                    <div class="sub">${esc(p.servizio.nome)} · <span class="price">${esc(fmtEuro(p.servizio.prezzo))}</span> · <span class="mono">@${esc(p.user)}</span></div>
+                </div>
+                ${p.stato === 'annullata' ? '<span class="badge off">Annullata</span>'
+                    : (finita ? '<span class="badge ok">Fatta</span>' : `<div class="actions"><button type="button" class="btn-danger btn-small" data-annulla="${p.id}">Annulla</button></div>`)}
+            </div>`;
+        }
+
+        async function carica() {
+            const lista = $('#lista');
+            lista.innerHTML = loadingHtml();
+            const q = $('#q').value.trim();
+            const filtri = st.tab === 'attive'
+                ? `data=${st.giorno}&stato=confermata`
+                : `da=${st.da}&a=${st.a}`;
+            const r = await api('GET', `/prenotazioni?${filtri}${q ? '&q=' + encodeURIComponent(q) : ''}`);
+            if (!r.ok) { lista.innerHTML = emptyHtml('fa-triangle-exclamation', r.error); $('#stato').textContent = ''; return; }
+            const p = r.data.prenotazioni;
+
+            if (st.tab === 'attive') {
+                const incasso = p.reduce((s, x) => s + x.servizio.prezzo, 0);
+                $('#stato').textContent = p.length ? `${p.length} ${p.length === 1 ? 'prenotazione' : 'prenotazioni'} · ${fmtEuro(incasso)}` : '';
+                lista.innerHTML = p.length ? p.map(x => riga(x, false)).join('')
+                    : emptyHtml('fa-calendar', q ? 'Nessuna prenotazione corrisponde alla ricerca.' : 'Nessuna prenotazione per questo giorno.');
+                const c = await api('GET', `/calendario?da=${st.giorno}&a=${st.giorno}`);
+                if (c.ok) {
+                    const g = c.data.giorni[0];
+                    $('#stato').textContent = (g.aperto ? 'Aperto ' + g.fasce.map(f => `${f.apertura}–${f.chiusura}`).join(' · ') : 'Salone chiuso')
+                        + ($('#stato').textContent ? '  |  ' + $('#stato').textContent : '');
+                }
+            } else {
+                p.sort((a, b) => (b.data + b.inizio).localeCompare(a.data + a.inizio));
+                $('#stato').textContent = p.length ? `${p.length} ${p.length === 1 ? 'prenotazione' : 'prenotazioni'}` : '';
+                lista.innerHTML = p.length ? p.map(x => riga(x, true)).join('')
+                    : emptyHtml('fa-clock-rotate-left', 'Nessuna prenotazione nel periodo scelto.');
+            }
+        }
+
+        function aggiornaGiorno() { $('#giorno').value = st.giorno; carica(); }
+
+        $('#giornoPrev').onclick = () => { st.giorno = addDaysISO(st.giorno, -1); aggiornaGiorno(); };
+        $('#giornoNext').onclick = () => { st.giorno = addDaysISO(st.giorno, 1); aggiornaGiorno(); };
+        $('#oggi').onclick = () => { st.giorno = todayISO(); aggiornaGiorno(); };
+        $('#giorno').onchange = e => { if (e.target.value) { st.giorno = e.target.value; carica(); } };
+        $('#da').onchange = e => { if (e.target.value) { st.da = e.target.value; carica(); } };
+        $('#a').onchange = e => { if (e.target.value) { st.a = e.target.value; carica(); } };
+        $('#q').addEventListener('input', debounce(carica));
+
+        $$('[data-tab]').forEach(b => b.onclick = () => {
+            st.tab = b.dataset.tab;
+            $$('[data-tab]').forEach(x => x.classList.toggle('active', x === b));
+            $('#barAttive').hidden = st.tab !== 'attive';
+            $('#barStorico').hidden = st.tab !== 'storico';
+            carica();
+        });
+
+        $('#lista').addEventListener('click', async e => {
+            const b = e.target.closest('[data-annulla]');
+            if (!b) return;
+            const ok = await confirmDialog({ title: 'Annullare la prenotazione?', message: 'Lo slot tornerà disponibile. Il cliente non riceve alcuna notifica automatica.', confirmText: 'Sì, annulla', cancelText: 'Mantieni', danger: true });
+            if (!ok) return;
+            const r = await api('DELETE', `/prenotazioni/${b.dataset.annulla}`);
+            if (!r.ok) return toast(r.error, 'err');
+            toast('Prenotazione annullata');
+            carica();
+        });
+
+        // ----- nuova prenotazione per conto di un cliente -----
+        async function nuovaPrenotazione() {
+            const [u, s] = await Promise.all([api('GET', '/getUsers'), api('GET', '/getServizi')]);
+            if (!u.ok) return toast(u.error, 'err');
+            if (!s.ok) return toast(s.status === 404 ? 'Crea prima almeno un servizio' : s.error, 'err');
+
+            const clienti = u.data.users.slice().sort((a, b) => `${a.cognome} ${a.nome}`.localeCompare(`${b.cognome} ${b.nome}`));
+            const etichetta = c => `${c.cognome} ${c.nome} (@${c.username})`;
+            const perEtichetta = new Map(clienti.map(c => [etichetta(c), c.username]));
+            const giornoIniziale = st.giorno < todayISO() ? todayISO() : st.giorno;
+
+            const m = openModal(`
+                <h2>Nuova prenotazione</h2>
+                <form novalidate>
+                    <div class="field">
+                        <label for="np_cliente">Cliente</label>
+                        <input id="np_cliente" list="np_clienti" autocomplete="off" placeholder="Cerca per cognome, nome o username">
+                        <datalist id="np_clienti">${clienti.map(c => `<option value="${esc(etichetta(c))}"></option>`).join('')}</datalist>
+                    </div>
+                    <div class="field">
+                        <label for="np_servizio">Servizio</label>
+                        <select id="np_servizio">${s.data.data.map(x => `<option value="${x.id}">${esc(x.nome)} · ${esc(x.durata)} min · ${esc(fmtEuro(x.prezzo))}</option>`).join('')}</select>
+                    </div>
+                    <div class="field">
+                        <label for="np_data">Giorno</label>
+                        <input id="np_data" type="date" min="${todayISO()}" value="${giornoIniziale}">
+                    </div>
+                    <div class="field">
+                        <label for="np_ora">Orario</label>
+                        <select id="np_ora"></select>
+                        <span class="muted" id="np_nota" style="font-size:.75rem"></span>
+                    </div>
+                    <div class="form-error" id="np_err" role="alert"></div>
+                    <div class="buttons">
+                        <button type="button" class="btn-ghost" id="np_annulla">Annulla</button>
+                        <button type="submit" id="np_ok" disabled>Prenota</button>
+                    </div>
+                </form>`);
+
+            const f = id => $('#' + id, m.el);
+            // Gli orari si ricaricano ogni volta che cambia servizio o giorno (l'admin non ha il preavviso minimo).
+            async function caricaOrari() {
+                const data = f('np_data').value;
+                f('np_ora').innerHTML = '';
+                f('np_ok').disabled = true;
+                f('np_nota').textContent = '';
+                if (!data) return;
+                const r = await api('GET', `/disponibilita?data=${data}&servizio=${f('np_servizio').value}&admin=1`);
+                if (!r.ok) { f('np_nota').textContent = r.error; return; }
+                if (!r.data.slots.length) { f('np_nota').textContent = 'Nessun orario libero in questo giorno per il servizio scelto.'; return; }
+                f('np_ora').innerHTML = r.data.slots.map(x => `<option value="${x}">${x}</option>`).join('');
+                f('np_nota').textContent = `${r.data.slots.length} orari liberi`;
+                f('np_ok').disabled = false;
+            }
+            f('np_servizio').onchange = caricaOrari;
+            f('np_data').onchange = caricaOrari;
+            f('np_annulla').onclick = m.close;
+            caricaOrari();
+
+            $('form', m.el).addEventListener('submit', async e => {
+                e.preventDefault();
+                const err = f('np_err');
+                err.textContent = '';
+                const username = perEtichetta.get(f('np_cliente').value.trim());
+                if (!username) { err.textContent = 'Scegli un cliente dall\'elenco'; return; }
+                f('np_ok').disabled = true;
+                const r = await api('POST', '/prenotazioni', {
+                    username, servizio: Number(f('np_servizio').value), data: f('np_data').value, ora: f('np_ora').value, da_admin: true,
+                });
+                if (!r.ok) { err.textContent = r.error; caricaOrari(); return; }
+                m.close();
+                toast('Prenotazione inserita');
+                st.tab = 'attive';
+                st.giorno = r.data.prenotazione.data;
+                $$('[data-tab]').forEach(x => x.classList.toggle('active', x.dataset.tab === 'attive'));
+                $('#barAttive').hidden = false;
+                $('#barStorico').hidden = true;
+                $('#q').value = '';
+                aggiornaGiorno();
+            });
+        }
+        $('#nuova').onclick = nuovaPrenotazione;
+
+        if (user) {
+            $('#giorno').value = st.giorno;
+            $('#da').value = st.da;
+            $('#a').value = st.a;
+            carica();
+            aggiornaBadgeRichieste().then(n => {
+                $('#richieste').hidden = n === 0;
+                $('#richiesteTesto').textContent = n === 1 ? '1 richiesta di registrazione in attesa' : `${n} richieste di registrazione in attesa`;
+            });
         }
     </script>
 </body>
