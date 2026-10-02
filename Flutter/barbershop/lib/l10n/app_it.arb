@@ -1,0 +1,56 @@
+{
+  "@@locale": "it",
+
+  "appTitle": "Barbshop",
+  "welcome": "Benvenuto su Barbshop",
+  "greeting": "Ciao {name}!",
+  "@greeting": {
+    "description": "Saluta l'utente usando il suo nome",
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "appointments": "{count, plural, =0{Nessun appuntamento} =1{1 appuntamento} other{{count} appuntamenti}}",
+  "@appointments": {
+    "description": "Mostra il numero di appuntamenti",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "navHome": "Home",
+  "navBook": "Prenota",
+  "navCatalog": "Catalogo",
+  "navProfile": "Profilo",
+
+  "profileInfo": "Informazioni profilo",
+  "changePassword": "Cambia password",
+  "faq": "FAQ",
+  "subscription": "Abbonamento",
+  "logout": "Logout",
+  "deleteAccount": "Elimina account",
+  "confirmDeletion": "Conferma eliminazione",
+  "deleteConfirmationText": "Sei sicuro di voler eliminare l'account?",
+  "yes": "Sì",
+  "no": "No",
+  "close": "Chiudi",
+  "subscribeNow": "Abbonati ora",
+  "noActiveSubscription": "Nessun abbonamento attivo.",
+  "logoutConfirmationText": "Sei sicuro di voler effettuare il logout?",
+
+  "profileId": "ID",
+  "profileRole": "Ruolo",
+  "profileName": "Nome",
+  "profileEmail": "Email",
+  "profilePhone": "Telefono",
+  "profileBio": "Bio",
+  "profileAddress": "Indirizzo",
+  "profileLatitude": "Latitudine",
+  "profileLongitude": "Longitudine",
+
+  "oldPassword": "Vecchia password",
+  "newPassword": "Nuova password",
+  "confirmNewPassword": "Conferma nuova password"
+}

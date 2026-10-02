@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'style.dart';
 import '../salone/servizi_page.dart';
 import '../salone/prenotazioni_page.dart';
@@ -8,7 +9,6 @@ import 'test.dart';
 import '../cliente/catalogo.dart';
 import '../cliente/home_cliente.dart';
 import '../cliente/prenota_page.dart';
-
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -25,9 +25,9 @@ class _HomePageState extends State<HomePage> {
     CatalogoPage(),
     ProfiloPage(),
   ];
-
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context)!;
     return Scaffold(
       backgroundColor: AppColors.backgroundColor,
       appBar: AppBar(
@@ -42,22 +42,22 @@ class _HomePageState extends State<HomePage> {
         unselectedItemColor: Colors.grey,
         backgroundColor: AppColors.backgroundColor,
         onTap: (index) => setState(() => _selectedIndex = index),
-        items: const [
+        items: [
           BottomNavigationBarItem(
             icon: Icon(Icons.calendar_today),
-            label: "Home",
+            label: loc.navHome,
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_bag),
-            label: "Prenota",
+            label: loc.navBook,
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.design_services),
-            label: "Catalogo",
+            label: loc.navCatalog,
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings),
-            label: "Profilo",
+            label: loc.navProfile,
           ),
         ],
       ),

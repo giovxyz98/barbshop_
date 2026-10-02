@@ -1,4 +1,6 @@
-Barbieri e clienti usano la stessa app scaricata dal Play Store. 
+
+
+Saloni e clienti usano la stessa app scaricata dal Play Store. 
 
 App Barbieri:
 L'app avrà N sezioni prinicipali:
