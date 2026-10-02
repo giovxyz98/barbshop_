@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tophair</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
     <link rel="stylesheet" href="style.css">
 
 </head>
@@ -41,7 +42,10 @@
             });
     
             if (response.ok) {
-                window.location.href = "home.html"; // Reindirizza dopo il login
+                const { user } = await response.json();
+                try { sessionStorage.setItem('user', JSON.stringify(user)); } catch (e) {}
+                // login fittizio: "admin..." va all'area admin, gli altri alla home cliente
+                window.location.href = user.ruolo === 'admin' ? "admin.html" : "home.html";
             } else {
                 document.getElementById('errorMessage').style.display = "block";
             }
