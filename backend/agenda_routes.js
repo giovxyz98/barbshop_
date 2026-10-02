@@ -1,17 +1,7 @@
 const express = require('express');
 const agenda = require('./agenda');
 const { logEvent } = require('../log/log');
-
-// Cattura errori sincroni degli handler e li traduce in risposte JSON { error }.
-const wrap = fn => (req, res) => {
-  try {
-    fn(req, res);
-  } catch (e) {
-    if (e instanceof agenda.AppError) return res.status(e.status).json({ error: e.message });
-    logEvent(`Errore ${req.method} ${req.path}: ${e.message} - Error`);
-    res.status(500).json({ error: 'Errore interno' });
-  }
-};
+const { wrap } = require('./wrap');
 
 module.exports = db => {
   const router = express.Router();
@@ -46,7 +36,7 @@ module.exports = db => {
     const { data, servizio } = req.query;
     if (!data) return res.status(400).json({ error: 'Data mancante' });
     if (!servizio) return res.status(400).json({ error: 'Servizio mancante' });
-    res.json(agenda.getDisponibilita(db, data, servizio));
+    res.json(agenda.getDisponibilita(db, data, servizio, undefined, { admin: req.query.admin === '1' }));
   }));
   router.get('/prenotazioni', wrap((req, res) => {
     res.json({ prenotazioni: agenda.listPrenotazioni(db, req.query) });

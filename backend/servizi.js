@@ -41,5 +41,30 @@ module.exports = db => {
     res.status(200).json({ message: 'Servizio aggiunto con successo', id: Number(r.lastInsertRowid) });
   }, 'addServizio'));
 
+  // Modifica di un servizio. Le prenotazioni esistenti conservano la durata con cui sono state fatte.
+  router.put('/servizi/:id', safe((req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: 'Id servizio non valido' });
+    const { nome, descrizione, prezzo, durata } = req.body || {};
+    if (!nome || !String(nome).trim()) return res.status(400).json({ message: 'Inserire il nome del servizio' });
+    if (prezzo === undefined || prezzo === '' || !(Number(prezzo) >= 0)) return res.status(400).json({ message: 'Inserire un prezzo valido' });
+    if (!Number.isInteger(Number(durata)) || Number(durata) <= 0) return res.status(400).json({ message: 'Inserire la durata del servizio in minuti (intero > 0)' });
+    const r = db.prepare('UPDATE servizi SET nome = ?, descrizione = ?, prezzo = ?, durata = ? WHERE id = ?')
+      .run(String(nome).trim(), descrizione ?? null, Number(prezzo), Number(durata), id);
+    if (r.changes === 0) return res.status(404).json({ message: 'Servizio non trovato' });
+    res.json({ message: 'Servizio modificato', data: db.prepare('SELECT * FROM servizi WHERE id = ?').get(id) });
+  }, 'editServizio'));
+
+  // Un servizio già usato da prenotazioni non si elimina (le prenotazioni lo referenziano).
+  router.delete('/servizi/:id', safe((req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id) || id <= 0) return res.status(400).json({ message: 'Id servizio non valido' });
+    if (db.prepare('SELECT 1 FROM prenotazioni WHERE servizio_id = ? LIMIT 1').get(id)) {
+      return res.status(409).json({ message: 'Il servizio è usato da delle prenotazioni e non può essere eliminato' });
+    }
+    if (db.prepare('DELETE FROM servizi WHERE id = ?').run(id).changes === 0) return res.status(404).json({ message: 'Servizio non trovato' });
+    res.json({ message: 'Servizio eliminato' });
+  }, 'deleteServizio'));
+
   return router;
 };

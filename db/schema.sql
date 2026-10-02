@@ -111,3 +111,29 @@ BEGIN
       AND inizio < NEW.fine AND fine > NEW.inizio
   );
 END;
+
+-- Catalogo prodotti del salone (solo vetrina: nessun acquisto online, si paga in sede).
+CREATE TABLE IF NOT EXISTS prodotti (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  categoria TEXT NOT NULL DEFAULT 'Altro',
+  descrizione TEXT,
+  prezzo REAL NOT NULL CHECK (prezzo >= 0),
+  immagine TEXT,                                            -- URL http(s), facoltativo
+  disponibile INTEGER NOT NULL DEFAULT 1 CHECK (disponibile IN (0, 1))
+);
+
+-- Richieste di registrazione dei clienti: le accetta o rifiuta l'admin.
+CREATE TABLE IF NOT EXISTS richieste_registrazione (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  nome TEXT NOT NULL,
+  cognome TEXT NOT NULL,
+  username TEXT NOT NULL,
+  password TEXT NOT NULL,
+  stato TEXT NOT NULL DEFAULT 'in_attesa' CHECK (stato IN ('in_attesa', 'accettata', 'rifiutata')),
+  creata TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  gestita TEXT
+);
+-- una sola richiesta in attesa per username
+CREATE UNIQUE INDEX IF NOT EXISTS uq_richiesta_in_attesa
+  ON richieste_registrazione (username) WHERE stato = 'in_attesa';

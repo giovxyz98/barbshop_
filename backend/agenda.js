@@ -208,15 +208,17 @@ function slotValidi(fasce, durata, step, occ, minStart) {
   return slots;
 }
 
-function minStartPerData(data, imp, ora) {
-  return data === ora.data ? ora.min + imp.anticipo_minimo : 0;
+// Primo minuto prenotabile in una data. Il giorno stesso vale il preavviso minimo; l'admin lo salta
+// (es. cliente in sede) ma non può comunque prenotare orari già passati.
+function minStartPerData(data, imp, ora, admin = false) {
+  return data === ora.data ? ora.min + (admin ? 0 : imp.anticipo_minimo) : 0;
 }
 
-function getDisponibilita(db, data, servizioId, ora = nowLocal()) {
+function getDisponibilita(db, data, servizioId, ora = nowLocal(), { admin = false } = {}) {
   const imp = getImpostazioni(db);
   checkData(data, imp, ora);
   const servizio = getServizio(db, servizioId);
-  const slots = slotValidi(fasceDelGiorno(db, data), servizio.durata, imp.slot_step, occupati(db, data), minStartPerData(data, imp, ora));
+  const slots = slotValidi(fasceDelGiorno(db, data), servizio.durata, imp.slot_step, occupati(db, data), minStartPerData(data, imp, ora, admin));
   return { data, servizio: { id: servizio.id, nome: servizio.nome, durata: servizio.durata }, slots: slots.map(fmtTime) };
 }
 
@@ -237,7 +239,8 @@ const SELECT_PRENOTAZIONE = `SELECT p.id, p.user, u.nome, u.cognome, p.servizio_
                              JOIN servizi s ON s.id = p.servizio_id`;
 
 // Crea una prenotazione. Tutti i controlli e l'INSERT avvengono nella stessa transazione.
-function prenota(db, { username, servizio, data, ora }, adesso = nowLocal()) {
+// da_admin: prenotazione inserita dal salone per conto di un cliente (salta il preavviso minimo).
+function prenota(db, { username, servizio, data, ora, da_admin = false }, adesso = nowLocal()) {
   if (typeof username !== 'string' || !username) throw new AppError(400, 'Nome utente mancante');
   if (servizio === undefined || servizio === null || servizio === '') throw new AppError(400, 'Servizio mancante');
   if (!data) throw new AppError(400, 'Data mancante');
@@ -258,7 +261,9 @@ function prenota(db, { username, servizio, data, ora }, adesso = nowLocal()) {
     if (fasce.length === 0) throw new AppError(409, 'Il salone è chiuso in questa data');
     const nelleFasce = fasce.some(([a, c]) => start >= a && start + s.durata <= c && (start - a) % imp.slot_step === 0);
     if (!nelleFasce) throw new AppError(400, 'Orario non valido: fuori dagli orari di apertura o non allineato agli slot');
-    if (start < minStartPerData(data, imp, adesso)) throw new AppError(400, `Servono almeno ${imp.anticipo_minimo} minuti di preavviso`);
+    if (start < minStartPerData(data, imp, adesso, da_admin === true)) {
+      throw new AppError(400, da_admin === true ? 'Orario già passato' : `Servono almeno ${imp.anticipo_minimo} minuti di preavviso`);
+    }
 
     if (db.prepare("SELECT 1 FROM prenotazioni WHERE user = ? AND data = ? AND stato = 'confermata'").get(username, data)) {
       throw new AppError(409, 'Hai già una prenotazione per questo giorno');
