@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tophair</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600&family=DM+Mono&family=Montserrat:wght@400;600&display=swap">
     <link rel="stylesheet" href="style.css">
 
 </head>
@@ -81,74 +82,43 @@
     </nav>
 
     <script>
-        function getOrario(giorno) {
-            var orarioString = { "mattino": "", "pomeriggio": "" };
-
-            if (giorno.lavorativo_mattino == 1) {
-                var orario = giorno.orario_mattino;
-                var orarioInizio = orario.split("-")[0];
-                var orarioFine = orario.split("-")[1];
-                var orarioInizioOre = formatOrario(orarioInizio);
-                var orarioFineOre = formatOrario(orarioFine);
-                orarioString.mattino = orarioInizioOre + " - " + orarioFineOre;
-            } else {
-                orarioString.mattino = "Chiuso";
-            }
-
-            if (giorno.lavorativo_pomeriggio == 1) {
-                var orario = giorno.orario_pomeriggio;
-                var orarioInizio = orario.split("-")[0];
-                var orarioFine = orario.split("-")[1];
-                var orarioInizioOre = formatOrario(orarioInizio);
-                var orarioFineOre = formatOrario(orarioFine);
-                orarioString.pomeriggio = orarioInizioOre + " - " + orarioFineOre;
-
-            } else {
-                orarioString.pomeriggio = "Chiuso";
-            }
-
-            return orarioString;
-        }
-
-        function formatOrario(orario) {
-            var ore = Math.floor(orario / 60);
-            var minuti = orario % 60;
-            return (ore < 10 ? "0" + ore : ore) + ":" + (minuti < 10 ? "0" + minuti : minuti);
-        }
-
-
+        const API = 'http://localhost:3000/api';
+        const NOMI_GIORNO = ['Domenica', 'Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato'];
 
         function changePage(id) {
             window.location.href = id + ".html";
         }
+
+        function isoLocale(d) {
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+
+        // Orari dei prossimi 7 giorni dal calendario del salone: una riga per fascia, "Chiuso" se non si lavora.
         async function fetchGiorni() {
             try {
-                const response = await fetch('http://localhost:3000/api/getGiorni');
+                const da = new Date();
+                const a = new Date();
+                a.setDate(a.getDate() + 6);
+                const response = await fetch(`${API}/calendario?da=${isoLocale(da)}&a=${isoLocale(a)}`);
+                const { giorni } = await response.json();
 
-                const giorni = await response.json();
-                console.log(giorni[0]);
-                const scheduleContainer = document.getElementById('giorni');
-                scheduleContainer.innerHTML = '';
-
+                const container = document.getElementById('giorni');
+                container.innerHTML = '';
                 giorni.forEach(giorno => {
-                    var orario = getOrario(giorno);
-                    const dayDiv = document.createElement('div');
-                    dayDiv.classList.add('day');
-
-                    const isClosed = !giorno.lavorativo_mattino && !giorno.lavorativo_pomeriggio;
-                    dayDiv.classList.add(isClosed ? 'closed' : 'open');
-
-                    dayDiv.innerHTML = `
-                <p>${giorno.nome}</p>
-                <small>${giorno.data}</small>
-                <strong>Mattino:</strong> ${orario.mattino}<br>
-                <strong>Pomeriggio:</strong> ${orario.pomeriggio}
-            `;
-
-                    scheduleContainer.appendChild(dayDiv);
+                    const [y, m, d] = giorno.data.split('-');
+                    const div = document.createElement('div');
+                    div.classList.add('day', giorno.aperto ? 'open' : 'closed');
+                    const orari = giorno.aperto
+                        ? giorno.fasce.map(f => `<span>${f.apertura} - ${f.chiusura}</span>`).join('')
+                        : 'Chiuso';
+                    div.innerHTML = `
+                        <p>${NOMI_GIORNO[giorno.giorno_settimana]}</p>
+                        <small>${d}/${m}/${y}</small>
+                        <div class="orari">${orari}</div>`;
+                    container.appendChild(div);
                 });
             } catch (error) {
-                console.error("Errore nel recupero dei giorni:", error);
+                console.error("Errore nel recupero degli orari:", error);
             }
         }
 
