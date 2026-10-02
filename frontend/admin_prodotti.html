@@ -34,12 +34,12 @@
             { name: 'categoria', label: 'Categoria', required: true, value: p ? p.categoria : CATEGORIE[1], list: { id: 'cat', values: [...new Set([...CATEGORIE, ...prodotti.map(x => x.categoria)])] } },
             { name: 'descrizione', label: 'Descrizione (facoltativa)', type: 'textarea', value: p ? p.descrizione : '' },
             { name: 'prezzo', label: 'Prezzo (€)', type: 'number', required: true, value: p ? p.prezzo : '', attrs: { min: 0, step: '0.01' } },
-            { name: 'immagine', label: 'Immagine (indirizzo web, facoltativa)', type: 'url', value: p ? p.immagine : '', attrs: { placeholder: 'https://…' } },
+            { name: 'immagine', label: 'Foto (facoltativa)', type: 'image', value: p ? p.immagine : '' },
             { name: 'disponibile', label: 'Visibile ai clienti', type: 'checkbox', value: p ? !!p.disponibile : true },
         ];
 
         async function salva(id, v) {
-            const body = { nome: v.nome.trim(), categoria: v.categoria.trim(), descrizione: v.descrizione.trim(), prezzo: Number(v.prezzo), immagine: v.immagine.trim(), disponibile: v.disponibile };
+            const body = { nome: v.nome.trim(), categoria: v.categoria.trim(), descrizione: v.descrizione.trim(), prezzo: Number(v.prezzo), immagine: v.immagine, disponibile: v.disponibile };
             const r = id ? await api('PUT', `/prodotti/${id}`, body) : await api('POST', '/prodotti', body);
             if (!r.ok) return r.error;
             toast(id ? 'Prodotto aggiornato' : 'Prodotto aggiunto');
@@ -54,6 +54,7 @@
             if (!prodotti.length) { box.innerHTML = emptyHtml('fa-bag-shopping', 'Il catalogo è vuoto: aggiungi il primo prodotto.'); return; }
             box.innerHTML = prodotti.map(p => `
                 <div class="item ${p.disponibile ? '' : 'off'}">
+                    <div class="miniatura" ${p.immagine ? `data-img="${esc(p.immagine)}"` : ''}>${p.immagine ? '' : '<i class="fa fa-image"></i>'}</div>
                     <div class="main">
                         <div class="title">${esc(p.nome)} ${p.disponibile ? '' : '<span class="badge off">Nascosto</span>'}</div>
                         <div class="sub">${esc(p.categoria)}${p.descrizione ? ' · ' + esc(p.descrizione) : ''}</div>
@@ -64,6 +65,7 @@
                         <button type="button" class="btn-danger btn-small btn-icon" data-del="${p.id}" aria-label="Elimina ${esc(p.nome)}"><i class="fa fa-trash"></i></button>
                     </div>
                 </div>`).join('');
+            $$('#lista .miniatura[data-img]').forEach(m => { m.style.backgroundImage = `url("${urlImmagine(m.dataset.img).replace(/"/g, '%22')}")`; });
         }
 
         $('#nuovo').onclick = async () => {

@@ -586,3 +586,19 @@ details.faq p { color: var(--muted); margin: 10px 0 2px; }
 /* giorni aperti cliccabili nella home */
 a.day { text-decoration: none; color: var(--text); cursor: pointer; transition: transform .2s, border-color .2s; }
 a.day:hover, a.day:focus-visible { transform: translateY(-3px); border-color: var(--gold); outline: none; }
+
+/* ---------- foto prodotto: campo del modulo e miniatura in elenco ---------- */
+.imgfield { display: flex; gap: 14px; align-items: center; }
+.imgprev, .miniatura {
+    flex-shrink: 0;
+    background: var(--panel-2) center / cover no-repeat;
+    border: 1px solid var(--gold-dim);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--gold-dim);
+}
+.imgprev { width: 96px; height: 96px; font-size: 1.6rem; }
+.miniatura { width: 46px; height: 46px; font-size: 1rem; }
+.imgbtns { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; min-width: 0; }
+.imgbtns .btn, .imgbtns button { cursor: pointer; }

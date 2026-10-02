@@ -47,6 +47,7 @@ Un salone = un'agenda unica (niente più operatori in parallelo).
 | GET/POST | `/getServizi`, `/getServizio?id=`, `/addServizio` | servizi |
 | PUT/DELETE | `/servizi/:id` | modifica; elimina (409 se già prenotato) |
 | GET/POST/PUT/DELETE | `/prodotti`, `/prodotti/:id` | catalogo (`?tutti=1` include i nascosti) |
+| POST | `/upload/immagine` (corpo = byte dell'immagine) | carica una foto (JPEG, PNG, WebP, GIF, max 6 MB) e restituisce `{ url: "/uploads/….jpg" }` da mettere in `immagine` del prodotto |
 | POST | `/registrazioni` | il cliente invia la richiesta di registrazione |
 | GET | `/registrazioni?stato=` | richieste (default: in attesa) |
 | POST | `/registrazioni/:id/accetta`, `/registrazioni/:id/rifiuta` | l'admin decide; accettando si crea l'utente `cliente` |
@@ -59,6 +60,7 @@ Gli orari sono sempre `HH:MM`, le date `YYYY-MM-DD`; gli errori rispondono `{ "e
 
 - `backend/` – `server.js`, `db.js` (apertura, migrazione, transazioni), `agenda.js` (logica di business), `agenda_routes.js`, `users.js`, `servizi.js`, `prodotti.js`, `registrazioni.js`, `auth.js`
 - `db/` – `database.db` e `schema.sql`
+- `uploads/` – foto dei prodotti caricate dall'admin (ignorata da git; `UPLOAD_DIR` per cambiare cartella). Il browser riduce la foto a 1280 px prima di inviarla, il server riconosce il formato dai byte e all'avvio elimina i file non associati a un prodotto
 - `test/` – test della logica, della concorrenza (più processi sullo stesso file), delle API e della migrazione
 - `log/log.js` – log applicativi (i `.txt` sono ignorati da git)
 - `frontend/` – pagine web: `app.js` (API, sessione, dialog, navigazione), `brand.js` (nome del locale), `style.css`; cliente: `index`, `registrati`, `home`, `prenota`, `shop`, `profilo`, `faq`; admin: `admin` (agenda), `admin_servizi`, `admin_prodotti`, `admin_orari`, `admin_utenti`
@@ -71,5 +73,7 @@ npm install
 npm start        # apri http://localhost:3000  (PORT e DB_PATH configurabili via variabili d'ambiente)
 npm test
 ```
+
+Dal telefono (stessa rete Wi-Fi del computer) apri `http://<indirizzo-del-computer>:3000`; il front-end usa lo stesso indirizzo anche per le API, quindi la gestione dei prodotti e il caricamento delle foto funzionano anche da mobile. Su Windows può servire consentire la porta 3000 nel firewall.
 
 Accesso di prova: qualsiasi credenziale. Uno username che inizia per `admin` entra nell'area del salone, gli altri come cliente.

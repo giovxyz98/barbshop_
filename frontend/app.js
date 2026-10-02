@@ -66,6 +66,90 @@ async function api(method, path, body) {
     }
 }
 
+// ---------- immagini ----------
+
+// Le foto caricate hanno un indirizzo relativo (/uploads/...): con i file aperti da disco serve l'origine del backend.
+const ORIGINE_API = API_BASE.startsWith('http') ? API_BASE.replace(/\/api$/, '') : '';
+const urlImmagine = u => (u && u.startsWith('/') ? ORIGINE_API + u : (u || ''));
+
+const MAX_UPLOAD = 6 * 1024 * 1024;
+
+// Riduce una foto (anche da 10 MB dal telefono) a max 1280 px in JPEG, tenendo conto dell'orientamento.
+async function ridimensionaImmagine(file, max = 1280, qualita = 0.85) {
+    let img;
+    try {
+        img = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    } catch (e) {
+        img = await new Promise((res, rej) => {
+            const i = new Image();
+            i.onload = () => res(i);
+            i.onerror = () => rej(new Error('Formato di immagine non supportato'));
+            i.src = URL.createObjectURL(file);
+        });
+    }
+    const k = Math.min(1, max / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(img.width * k));
+    c.height = Math.max(1, Math.round(img.height * k));
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff';                       // le trasparenze (PNG) diventano bianche nel JPEG
+    ctx.fillRect(0, 0, c.width, c.height);
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    if (img.close) img.close();
+    return new Promise((res, rej) => c.toBlob(b => (b ? res(b) : rej(new Error('Impossibile elaborare la foto'))), 'image/jpeg', qualita));
+}
+
+// Carica una foto e restituisce il suo indirizzo (/uploads/...). Lancia un Error con un testo leggibile.
+async function caricaImmagine(file) {
+    let blob;
+    try {
+        blob = await ridimensionaImmagine(file);
+    } catch (e) {
+        // se il browser non riesce a rielaborarla, si invia l'originale solo se è già un formato accettato e abbastanza piccolo
+        if (/^image\/(jpeg|png|webp|gif)$/.test(file.type) && file.size <= MAX_UPLOAD) blob = file;
+        else throw new Error(e.message || 'Foto non utilizzabile');
+    }
+    let r;
+    try {
+        r = await fetch(API_BASE + '/upload/immagine', { method: 'POST', headers: { 'Content-Type': blob.type || 'image/jpeg' }, body: blob });
+    } catch (e) {
+        throw new Error('Server non raggiungibile. Controlla che sia avviato.');
+    }
+    const data = await r.json().catch(() => null);
+    if (!r.ok) throw new Error((data && data.error) || 'Caricamento non riuscito');
+    return data.url;
+}
+
+// Campo "foto" di un modulo: anteprima, scelta da fotocamera o galleria, rimozione. Il valore è l'indirizzo caricato.
+function iniziaCampoImmagine(root, submit) {
+    const prev = $('.imgprev', root), file = $('input[type="file"]', root), val = $('input[type="hidden"]', root);
+    const stato = $('.imgstato', root), clear = $('[data-img-clear]', root);
+    const mostra = () => {
+        const u = urlImmagine(val.value);
+        prev.style.backgroundImage = u ? `url("${u.replace(/"/g, '%22')}")` : '';
+        prev.innerHTML = u ? '' : '<i class="fa fa-image"></i>';
+        clear.hidden = !val.value;
+    };
+    file.addEventListener('change', async () => {
+        const f = file.files[0];
+        if (!f) return;
+        stato.textContent = 'Caricamento…';
+        submit.disabled = true;
+        try {
+            val.value = await caricaImmagine(f);
+            stato.textContent = '';
+        } catch (e) {
+            stato.textContent = e.message;
+        } finally {
+            submit.disabled = false;
+            file.value = '';                       // permette di riscegliere lo stesso file
+            mostra();
+        }
+    });
+    clear.onclick = () => { val.value = ''; stato.textContent = ''; mostra(); };
+    mostra();
+}
+
 // ---------- toast ----------
 
 function toast(msg, type = 'ok') {
@@ -120,6 +204,19 @@ function formModal({ title, intro, fields, submitText = 'Salva', danger = false,
             if (f.type === 'checkbox') {
                 return `<div class="check"><input type="checkbox" id="${id}" name="${f.name}" ${f.value ? 'checked' : ''}><label class="lbl" for="${id}">${esc(f.label)}</label></div>`;
             }
+            if (f.type === 'image') {
+                return `<div class="field"><label>${esc(f.label)}</label>
+                    <div class="imgfield" data-img="${esc(f.name)}">
+                        <div class="imgprev"></div>
+                        <div class="imgbtns">
+                            <label class="btn btn-ghost btn-small" for="${id}"><i class="fa fa-camera"></i> Scegli foto</label>
+                            <button type="button" class="btn-danger btn-small" data-img-clear hidden>Rimuovi</button>
+                            <span class="muted imgstato" style="font-size:.75rem" role="status"></span>
+                        </div>
+                        <input type="file" id="${id}" accept="image/*" hidden>
+                        <input type="hidden" name="${f.name}" value="${esc(f.value ?? '')}">
+                    </div></div>`;
+            }
             let ctrl;
             if (f.type === 'select') {
                 ctrl = `<select id="${id}" name="${f.name}">${(f.options || []).map(o => `<option value="${esc(o.value)}" ${String(o.value) === String(f.value) ? 'selected' : ''}>${esc(o.label)}</option>`).join('')}</select>`;
@@ -147,6 +244,7 @@ function formModal({ title, intro, fields, submitText = 'Salva', danger = false,
         const submit = $('[type="submit"]', m.el);
         $('[data-act="no"]', m.el).onclick = () => { m.close(); resolve(false); };
         m.back.addEventListener('dismiss', () => resolve(false));
+        $$('.imgfield', m.el).forEach(box => iniziaCampoImmagine(box, submit));
 
         form.addEventListener('submit', async e => {
             e.preventDefault();

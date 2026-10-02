@@ -50,7 +50,7 @@
                 img.onload = () => { t.innerHTML = ''; t.style.backgroundImage = `url("${img.src.replace(/"/g, '%22')}")`; };
                 img.onerror = () => { t.innerHTML = '<i class="fa fa-bottle-droplet"></i>'; };
                 t.innerHTML = '<i class="fa fa-bottle-droplet"></i>';
-                img.src = t.dataset.img;
+                img.src = urlImmagine(t.dataset.img);
             });
         }
 

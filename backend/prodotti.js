@@ -2,6 +2,7 @@ const express = require('express');
 const { AppError } = require('./agenda');
 const { wrap } = require('./wrap');
 const { logEvent } = require('../log/log');
+const { URL_LOCALE, rimuoviImmagine } = require('./upload');
 
 // Valida e normalizza i campi di un prodotto.
 function leggiProdotto(body) {
@@ -16,7 +17,9 @@ function leggiProdotto(body) {
   const categoria = (typeof b.categoria === 'string' && b.categoria.trim()) || 'Altro';
   const descrizione = typeof b.descrizione === 'string' && b.descrizione.trim() ? b.descrizione.trim() : null;
   const immagine = typeof b.immagine === 'string' && b.immagine.trim() ? b.immagine.trim() : null;
-  if (immagine && !/^https?:\/\/\S+$/i.test(immagine)) throw new AppError(400, "L'immagine deve essere un indirizzo http(s)");
+  if (immagine && !/^https?:\/\/\S+$/i.test(immagine) && !URL_LOCALE.test(immagine)) {
+    throw new AppError(400, 'Immagine non valida: carica una foto o indica un indirizzo http(s)');
+  }
   const disponibile = b.disponibile === undefined ? 1 : (b.disponibile === false || b.disponibile === 0 || b.disponibile === '0' ? 0 : 1);
   return { nome, categoria, descrizione, prezzo, immagine, disponibile };
 }
@@ -27,7 +30,7 @@ function idValido(v) {
   return n;
 }
 
-module.exports = db => {
+module.exports = (db, uploadDir) => {
   const router = express.Router();
   const get = id => db.prepare('SELECT * FROM prodotti WHERE id = ?').get(id);
 
@@ -47,16 +50,20 @@ module.exports = db => {
 
   router.put('/prodotti/:id', wrap((req, res) => {
     const id = idValido(req.params.id);
-    if (!get(id)) throw new AppError(404, 'Prodotto non trovato');
+    const vecchio = get(id);
+    if (!vecchio) throw new AppError(404, 'Prodotto non trovato');
     const p = leggiProdotto(req.body);
     db.prepare('UPDATE prodotti SET nome = ?, categoria = ?, descrizione = ?, prezzo = ?, immagine = ?, disponibile = ? WHERE id = ?')
       .run(p.nome, p.categoria, p.descrizione, p.prezzo, p.immagine, p.disponibile, id);
+    if (vecchio.immagine !== p.immagine) rimuoviImmagine(vecchio.immagine, uploadDir);   // la foto sostituita non resta su disco
     res.json({ prodotto: get(id) });
   }));
 
   router.delete('/prodotti/:id', wrap((req, res) => {
     const id = idValido(req.params.id);
+    const vecchio = get(id);
     if (db.prepare('DELETE FROM prodotti WHERE id = ?').run(id).changes === 0) throw new AppError(404, 'Prodotto non trovato');
+    rimuoviImmagine(vecchio.immagine, uploadDir);
     res.json({ message: 'Prodotto eliminato' });
   }));
 
